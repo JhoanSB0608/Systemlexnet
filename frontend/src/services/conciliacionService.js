@@ -61,7 +61,6 @@ export const downloadConciliacionDocument = async (solicitudId, format = 'pdf') 
   }
 };
 
-const conciliacionService = { createConciliacion, downloadConciliacionDocument, getConciliacionById, updateConciliacion };
 
 export const getConciliacionById = async (solicitudId) => {
   try {
@@ -84,5 +83,7 @@ export const updateConciliacion = async (solicitudId, payload) => {
     throw err.response?.data || { message: err.message || 'Error actualizando la solicitud' };
   }
 };
+
+const conciliacionService = { createConciliacion, downloadConciliacionDocument, getConciliacionById, updateConciliacion };
 
 export default conciliacionService;
