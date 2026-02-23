@@ -20,21 +20,14 @@ import {
   Avatar,
   Chip,
   IconButton,
-  Tooltip,
-  Zoom,
-  Divider
+  Zoom
 } from '@mui/material';
 import {
   Description as DescriptionIcon,
-  CloudDownload as CloudDownloadIcon,
   PictureAsPdf as PictureAsPdfIcon,
-  Article as ArticleIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  ArrowForward as ArrowForwardIcon,
-  Info as InfoIcon,
   Close as CloseIcon,
-  Verified as VerifiedIcon,
   AutoAwesome as AutoAwesomeIcon
 } from '@mui/icons-material';
 import InsolvenciaForm from '../components/forms/InsolvenciaForm';
@@ -46,14 +39,10 @@ import { handleAxiosError, showSuccess } from '../utils/alert';
 
 // Glassmorphism Card Component
 const GlassCard = React.forwardRef(({ children, sx = {}, hover = true, ...props }, ref) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
   return (
     <Paper
       ref={ref}
       elevation={0}
-      onMouseEnter={() => hover && setIsHovered(true)}
-      onMouseLeave={() => hover && setIsHovered(false)}
       sx={{
         background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%)',
         backdropFilter: 'blur(25px)',
@@ -206,7 +195,6 @@ const NuevaSolicitudPage = () => {
     return React.cloneElement(formToRender, { onSubmit: handleFormSubmit, resetToken: formResetToken });
   };
 
-  const selectedTipoData = tiposDeSolicitud.find(t => t.value === tipoSeleccionado);
 
   return (
     <Box

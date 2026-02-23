@@ -17,7 +17,6 @@ import {
   Collapse,
   Divider,
   Chip,
-  Badge,
   Paper,
   Zoom,
   Fade
@@ -32,9 +31,7 @@ import {
   AutoAwesome as AutoAwesomeIcon,
   Gavel as GavelIcon,
   ExpandMore as ExpandMoreIcon,
-  Info as InfoIcon,
   ArrowForward as ArrowForwardIcon,
-  PlayArrow as PlayArrowIcon,
   Star as StarIcon,
   Verified as VerifiedIcon
 } from '@mui/icons-material';
