@@ -631,6 +631,7 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   // Watchers
   const watchedAcreencias = watch('acreencias');
   const watchedGastos = watch('informacionFinanciera.gastosPersonales');
+  console.log('Watched Gastos:', watchedGastos);
   const watchedIngresos = watch('informacionFinanciera.ingresosActividadPrincipal');
   const watchSociedadActiva = watch('sociedadConyugal.activa');
   const tipoNegociacion = watch('propuestaPago.tipoNegociacion');
@@ -661,7 +662,11 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     'recreacion', 'gastosPersonasCargo', 'otros'
   ].reduce((sum, key) => sum + (parseFloat(watchedGastos?.[key]) || 0), 0);
 
+  console.log('Total Gastos:', totalGastos);
+
   const disponibleParaPago = (parseFloat(watchedIngresos) || 0) - totalGastos;
+
+  console.log('Disponible para Pago:', disponibleParaPago);
 
   useEffect(() => {
     setValue('propuestaPago.valorCuotaSugerido', disponibleParaPago > 0 ? disponibleParaPago : 0);

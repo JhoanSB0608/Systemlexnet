@@ -335,7 +335,7 @@ function buildDocDefinition(solicitud = {}) {
 
     const detalleRows = [
       ['Nombre', nombreAcreedor],
-      ['Tipo de Documento', a.tipoDoc],
+      ['Tipo de Documento', a.acreedor.tipoDoc],
       ['No. de Documento', safe((a.acreedor && (a.acreedor.nit || a.acreedor.nitCc || a.acreedor.documento)) || a.documento || '')],
       ['Dirección de notificación judicial', (a.acreedor && a.acreedor.direccion) || safe(a.direccion)],
       ['País', 'Colombia'],

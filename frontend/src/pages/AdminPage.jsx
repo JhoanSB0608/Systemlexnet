@@ -726,8 +726,8 @@ const AcreedoresModal = ({ open, onClose, acreedores }) => {
                   transition: 'all 0.2s ease',
                 }}
               >
-                <TableCell>{item.acreedor?.nombreCompleto || 'N/A'}</TableCell>
-                <TableCell>{`${item.acreedor?.tipoIdentificacion || ''} - ${item.acreedor?.numeroIdentificacion || ''}`}</TableCell>
+                <TableCell>{item.acreedor?.nombre || 'N/A'}</TableCell>
+                <TableCell>{`${item.acreedor?.tipoDoc || ''} - ${item.acreedor?.nitCc || ''}`}</TableCell>
                 <TableCell align="right">
                   <Chip 
                     label={`$${item.capital?.toLocaleString() || 0}`}
