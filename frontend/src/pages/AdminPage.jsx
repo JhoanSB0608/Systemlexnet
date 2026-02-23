@@ -716,29 +716,36 @@ const AcreedoresModal = ({ open, onClose, acreedores }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {acreedores.map((item, index) => (
-              <TableRow 
-                key={index}
-                sx={{
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.03),
-                  },
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <TableCell>{(item.acreedor && (typeof item.acreedor === 'object' ? (item.acreedor.nombre || '') : item.acreedor)) || 'N/A'}</TableCell>
-                {console.log('Rendering Acreedor:', item.acreedor)}
-                <TableCell>{(item.acreedor && (typeof item.acreedor === 'object' ? `${item?.acreedor.tipoDoc || ''} - ${item?.acreedor.nitCc || ''}` : item?.tipoDoc || '')) || 'N/A'}</TableCell>
-                <TableCell align="right">
-                  <Chip 
-                    label={`$${item.capital?.toLocaleString() || 0}`}
-                    color="success"
-                    size="small"
-                    sx={{ fontWeight: 700 }}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
+            {acreedores.map((item, index) => {
+              const acreedor = item.acreedor || {};
+              const nombre = typeof acreedor === 'object' ? (acreedor.nombre || 'N/A') : (acreedor || 'N/A');
+              const documento = typeof acreedor === 'object' 
+                ? `${acreedor.tipoDoc || ''} ${acreedor.nitCc || acreedor.nit || acreedor.documento || ''}`.trim() || 'N/A'
+                : 'N/A';
+
+              return (
+                <TableRow 
+                  key={index}
+                  sx={{
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.03),
+                    },
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <TableCell>{nombre}</TableCell>
+                  <TableCell>{documento}</TableCell>
+                  <TableCell align="right">
+                    <Chip 
+                      label={`$${item.capital?.toLocaleString() || 0}`}
+                      color="success"
+                      size="small"
+                      sx={{ fontWeight: 700 }}
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>

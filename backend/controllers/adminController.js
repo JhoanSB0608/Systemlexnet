@@ -97,7 +97,7 @@ const getSolicitudes = async (req, res) => {
 
     // Perform parallel queries
     const [solicitudesInsolvencia, solicitudesConciliacion, countInsolvencia, countConciliacion] = await Promise.all([
-      Solicitud.find(query).populate('user', 'name email').lean(),
+      Solicitud.find(query).populate('user', 'name email').populate('acreencias.acreedor').lean(),
       Conciliacion.find(query).populate('user', 'name email').lean(),
       Solicitud.countDocuments(query),
       Conciliacion.countDocuments(query)
