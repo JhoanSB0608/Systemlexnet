@@ -4,8 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const PdfPrinter = require('pdfmake');
 const { Unidades } = require('./numeroALetras');
-const { info } = require('console');
-const { height } = require('pdfkit/js/page');
 
 // -------------------- Fuentes --------------------
 const fontsDir = path.resolve(__dirname, '..', 'fonts');
