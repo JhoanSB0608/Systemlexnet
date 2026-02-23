@@ -1513,7 +1513,7 @@ const AdminPage = () => {
   const [columnFilters, setColumnFilters] = useState([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [localFilters, setLocalFilters] = useState({ tipoSolicitud: '', user: '' });
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey] = useState(0);
   const debouncedLocalFilters = useDebounce(localFilters, 500);
   const [expanded, setExpanded] = useState({});
 

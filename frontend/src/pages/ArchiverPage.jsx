@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom';
 
 // Glassmorphism Card Component (reused)
 const GlassCard = React.forwardRef(({ children, sx = {}, hover = true, ...props }, ref) => {
-  const [isHovered, setIsHovered] = useState(false);
+  const [, setIsHovered] = useState(false);
   
   return (
     <Paper

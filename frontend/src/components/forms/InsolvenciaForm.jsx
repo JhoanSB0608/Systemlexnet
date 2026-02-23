@@ -42,7 +42,7 @@ import { uploadFile } from '../../services/fileStorageService';
 
 // Glassmorphism Card Component
 const GlassCard = ({ children, sx = {}, hover = true, ...props }) => {
-  const [isHovered, setIsHovered] = useState(false);
+  const [, setIsHovered] = useState(false);
   
   return (
     <Paper

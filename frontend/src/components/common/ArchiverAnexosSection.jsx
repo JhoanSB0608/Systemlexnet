@@ -98,7 +98,7 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
 };
 
 const GlassCard = ({ children, sx = {}, hover = true, ...props }) => { // Re-defining GlassCard for self-containment
-  const [isHovered, setIsHovered] = useState(false);
+  const [, setIsHovered] = useState(false);
 
   return (
     <Paper
