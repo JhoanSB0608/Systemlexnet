@@ -5,10 +5,8 @@ import {
   Chip, IconButton, Tooltip, CircularProgress
 } from '@mui/material';
 import {
-  Description as DescriptionIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  ArrowForward as ArrowForwardIcon,
   Info as InfoIcon,
   Close as CloseIcon,
   Archive as ArchiveIcon,
@@ -18,7 +16,6 @@ import ArchiverInsolvenciaForm from '../components/forms/ArchiverInsolvenciaForm
 import ArchiverConciliacionForm from '../components/forms/ArchiverConciliacionForm';
 import { createArchiverEntry, getArchiverEntryById } from '../services/archiverService';
 import { showSuccess, handleAxiosError } from '../utils/alert';
-import { toast } from 'react-toastify';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
@@ -179,7 +176,6 @@ const ArchiverPage = () => {
     return null;
   };
 
-  const selectedTipoData = tiposDeSolicitud.find(t => t.value === tipoSeleccionado);
 
   return (
     <Box

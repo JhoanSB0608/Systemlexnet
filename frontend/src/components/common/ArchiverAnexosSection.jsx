@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Button, Typography, Box, Stack, Avatar, IconButton, CircularProgress, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, useTheme, alpha, List, ListItem, ListItemText, ListItemIcon, Paper
+  DialogContent, DialogActions, TextField, useTheme, alpha, List, Paper
 } from '@mui/material';
 import {
   Description as DescriptionIcon,
@@ -99,7 +99,6 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
 
 const GlassCard = ({ children, sx = {}, hover = true, ...props }) => { // Re-defining GlassCard for self-containment
   const [isHovered, setIsHovered] = useState(false);
-  const theme = useTheme(); // Access theme here
 
   return (
     <Paper

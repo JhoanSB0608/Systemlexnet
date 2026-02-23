@@ -4,15 +4,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createAcreedor, getAcreedor, updateAcreedor } from '../services/acreedorService';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  TextField, Button, Typography, Box, FormControl, InputLabel, Select, MenuItem, 
-  Paper, IconButton, Card, CardContent, Avatar, Container, Stack, Grid, 
+  TextField, Button, Typography, Box, FormControl, InputLabel, Select, MenuItem, IconButton, 
+  CardContent, Avatar, Container, Stack, 
   InputAdornment, Chip, Fade, Slide, Grow, Alert, CircularProgress, Stepper, Step, 
-  StepLabel, useTheme, alpha, Divider, Tooltip
+  StepLabel, useTheme, alpha, Tooltip
 } from '@mui/material';
 import {
-  ArrowBack, Person as PersonIcon, Business as BusinessIcon, 
+  ArrowBack, Person as PersonIcon,
   Badge as BadgeIcon, LocationOn as LocationIcon, Email as EmailIcon,
-  Phone as PhoneIcon, Home as HomeIcon, Public as PublicIcon,
+  Phone as PhoneIcon, Home as HomeIcon,
   Save as SaveIcon, Edit as EditIcon, Add as AddIcon, CheckCircle,
   Error as ErrorIcon
 } from '@mui/icons-material';

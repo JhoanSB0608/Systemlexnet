@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { 
   TextField, Button, Typography, Box, Grid, FormControl, InputLabel, Select, MenuItem,
-  FormHelperText, useTheme, alpha, Stack, Avatar, Paper,
+  FormHelperText, useTheme, alpha, Stack, Avatar,
 } from '@mui/material';
 import {
   Person as PersonIcon,

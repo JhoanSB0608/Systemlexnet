@@ -1,8 +1,8 @@
 import React from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { 
-  TextField, Button, Typography, Box, Grid, FormControl, InputLabel, Select, MenuItem,
-  FormHelperText, useTheme, alpha, Stack, Avatar, Paper,
+  TextField, Button, Typography, Grid, FormControl, InputLabel, Select, MenuItem,
+  FormHelperText, useTheme, alpha, Stack, Avatar,
 } from '@mui/material';
 import {
   Gavel as GavelIcon,

@@ -411,7 +411,7 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
           hechos: true, pretensiones: true, anexos: true, firma: true,
       });
     }
-  }, [initialData, reset]);
+  }, [initialData, reset, setValue]);
 
   useLayoutEffect(() => {
     function handleResize() {

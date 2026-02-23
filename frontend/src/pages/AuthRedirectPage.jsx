@@ -1,14 +1,10 @@
-import React, { useEffect, useContext } from 'react';
+import React, { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../App';
 import { Box, CircularProgress, Typography } from '@mui/material';
 
 const AuthRedirectPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  // No need for loadUser here, as we're forcing a reload.
-  // const { loadUser } = useContext(AuthContext); 
-
   useEffect(() => {
     const token = searchParams.get('token');
     if (token) {

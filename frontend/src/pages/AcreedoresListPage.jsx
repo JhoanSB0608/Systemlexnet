@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAcreedores, deleteAcreedor } from '../services/acreedorService';
 import {
@@ -9,9 +9,9 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button,
   Typography, Box, TextField, Stack, CircularProgress, Alert, IconButton, TablePagination,
-  Card, CardContent, Avatar, Container, Tooltip, Chip, Fade, Grow, Slide, Grid,
+  CardContent, Avatar, Container, Tooltip, Chip, Fade, Grow, Slide, Grid,
   InputAdornment, Dialog, DialogTitle, DialogContent, DialogActions, useTheme, alpha,
   Divider
 } from '@mui/material';
@@ -160,10 +160,10 @@ const AcreedoresListPage = () => {
       }, 3000); // 3 seconds
       return () => clearTimeout(timer);
     }
-  }, [deleteMutation.isSuccess, deleteMutation.reset]);
+  }, [deleteMutation, deleteMutation.isSuccess, deleteMutation.reset]);
 
   // Utility functions
-  const getDocTypeInfo = (tipoDoc) => {
+  const getDocTypeInfo = useCallback((tipoDoc) => {
     const types = {
       'CC': { label: 'C.C', color: theme.palette.primary.main, icon: PersonIcon },
       'NIT': { label: 'NIT', color: theme.palette.secondary.main, icon: BusinessIcon },
@@ -171,7 +171,7 @@ const AcreedoresListPage = () => {
       'default': { label: tipoDoc, color: theme.palette.grey[600], icon: BadgeIcon }
     };
     return types[tipoDoc] || types.default;
-  };
+  }, [theme.palette.primary.main, theme.palette.secondary.main, theme.palette.info.main, theme.palette.grey]);
 
   // Table columns definition
   const columns = useMemo(() => [
@@ -313,7 +313,9 @@ const AcreedoresListPage = () => {
         </Stack>
       ),
     },
-  ], [theme, deleteMutation.isLoading]);
+  ], [theme.palette.primary.main, theme.palette.info.main, 
+    theme.palette.secondary.main, theme.palette.error.main, 
+    theme.palette.grey, getDocTypeInfo, deleteMutation.isLoading]);
 
   // Table configuration
   const table = useReactTable({

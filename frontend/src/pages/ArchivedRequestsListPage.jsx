@@ -9,22 +9,20 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button,
   Typography, Box, TextField, Stack, CircularProgress, Alert, IconButton, TablePagination,
-  Card, CardContent, Avatar, Container, Tooltip, Chip, Fade, Grow, Slide, Grid,
+  CardContent, Avatar, Container, Tooltip, Chip, Fade, Grow, Slide, Grid,
   InputAdornment, useTheme, alpha,
-  Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, ListItemIcon, Badge
+  Dialog, DialogTitle, DialogContent, Badge
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useDebounce } from '../hooks/useDebounce';
 import {
   Archive as ArchiveIcon, Refresh, Add, Search, FilterList, Description as DescriptionIcon,
   ArrowUpward, ArrowDownward,
-  Close as CloseIcon, Person as PersonIcon, Business as BusinessIcon,
+  Close as CloseIcon,
   Email as EmailIcon, Phone as PhoneIcon, LocationOn as LocationOnIcon
 } from '@mui/icons-material';
-import { toast } from 'react-toastify';
-import { handleAxiosError } from '../utils/alert';
 
 import GlassCard from '../components/common/GlassCard';
 import { ArchiverAnexosSection } from '../components/common/ArchiverAnexosSection';
@@ -192,7 +190,6 @@ const PersonInfoModal = ({ open, onClose, data, title }) => {
 };
 
 const AnexosViewerAndUploaderModal = ({ open, onClose, archiverEntryId, onUploadSuccess }) => {
-  const theme = useTheme(); // Move useTheme to the top level
   const { data: entryData, isLoading, isError, refetch } = useQuery({
     queryKey: ['archiverEntry', archiverEntryId],
     queryFn: () => getArchiverEntryById(archiverEntryId),
@@ -429,7 +426,7 @@ const ArchivedRequestsListPage = () => {
         );
       }
     },
-  ], [theme]);
+  ], []);
 
   const table = useReactTable({
     data: filteredAndSortedData,
