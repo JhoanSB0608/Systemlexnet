@@ -98,13 +98,6 @@ function buildDocDefinition(solicitud = {}) {
         { text: `${safe(sede.ciudad)} - ${safe(sede.departamento)}`, fontSize: 9, margin: [0, 0, 0, 8] }
       ]
     },
-    {
-      width: 100,
-      stack: [
-        { text: 'Recibido', fontSize: 8, bold: true, alignment: 'right', margin: [0, 0, 0, 1] },
-        { text: `FECHA: ${moment().format('DD/MM/YYYY')}`, fontSize: 8, alignment: 'right', margin: [0, 0, 0, 0] }
-      ]
-    }
   ]
 });
 
@@ -1344,20 +1337,6 @@ if (!propuestaPago || propuestaPago.tipoNegociacion !== 'proyeccion') {
     text: nombreCompleto,
     fontSize: 9,
     bold: true,
-    alignment: 'center',
-    margin: [0, 0, 0, 1]
-  });
-  
-  c.push({
-    text: safe(deudor.email),
-    fontSize: 9,
-    alignment: 'center',
-    margin: [0, 0, 0, 1]
-  });
-  
-  c.push({
-    text: `Fecha: ${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'numeric', year: 'numeric' })} - ${new Date().toLocaleTimeString('es-CO')}`,
-    fontSize: 9,
     alignment: 'center',
     margin: [0, 0, 0, 1]
   });
