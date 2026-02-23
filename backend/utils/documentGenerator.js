@@ -5,6 +5,7 @@ const path = require('path');
 const PdfPrinter = require('pdfmake');
 const { Unidades } = require('./numeroALetras');
 const { info } = require('console');
+const { height } = require('pdfkit/js/page');
 
 // -------------------- Fuentes --------------------
 const fontsDir = path.resolve(__dirname, '..', 'fonts');
@@ -1265,28 +1266,35 @@ if (!propuestaPago || propuestaPago.tipoNegociacion !== 'proyeccion') {
     bold: true,
     margin: [0, 6, 0, 6]
   });
-  
+
   c.push({
     text: 'Para efectos del cumplimiento de los requisitos exigidos, se anexan los siguientes documentos:',
     fontSize: 9,
     alignment: 'justify',
     margin: [15, 0, 0, 3]
   });
-  
-  c.push({
-    text: '13.1 Otros anexos',
-    fontSize: 9,
-    margin: [15, 3, 0, 1]
-  });
-  
-  const anexos = solicitud.anexos || ['ANEXOS - ' + (nombreCompleto || 'DEUDOR').toUpperCase()];
-  anexos.forEach(anexo => {
-    c.push({
-      text: `     • ${anexo.filename}`,
-      fontSize: 9,
-      margin: [15, 1, 0, 1]
+
+  const anexos = Array.isArray(solicitud?.anexos) ? solicitud.anexos : [];
+
+  if (anexos.length > 0) {
+    anexos.forEach((anexo, index) => {
+      const nombre = anexo?.name || 'Documento sin nombre';
+      const descripcion = anexo?.descripcion ? ` - ${anexo.descripcion}` : '';
+
+      c.push({
+        text: `${index + 1}. ${descripcion} - ${nombre}`,
+        fontSize: 9,
+        margin: [20, 2, 0, 2]
+      });
     });
-  });
+  } else {
+    c.push({
+      text: 'No se anexaron documentos a la presente solicitud.',
+      fontSize: 9,
+      italics: true,
+      margin: [20, 2, 0, 2]
+    });
+  }
 
   // ========== 14. NOTIFICACIONES ==========
   c.push({ 
@@ -1328,6 +1336,7 @@ if (!propuestaPago || propuestaPago.tipoNegociacion !== 'proyeccion') {
     c.push({
       image: firma.data,
       width: 150,
+      height: 50,
       alignment: 'center',
       margin: [0, 0, 0, 5],
     });
