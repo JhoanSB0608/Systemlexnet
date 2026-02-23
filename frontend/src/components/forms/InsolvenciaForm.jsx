@@ -653,7 +653,14 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   };
   const cumpleRequisitos = validacionInsolvencia.dosOMasObligaciones && validacionInsolvencia.hayCreditosEnMora && validacionInsolvencia.pasivoEnMoraSuperior30Pct;
 
-  const totalGastos = Object.values(watchedGastos || {}).reduce((sum, value) => sum + (parseFloat(value) || 0), 0);
+  const totalGastos = [
+    'alimentacion', 'salud', 'arriendo', 'serviciosPublicos', 'educacion',
+    'transporte', 'conservacionBienes', 'cuotaLeasingHabitacional',
+    'arriendoOficina', 'cuotaSeguridadSocial', 'cuotaAdminPropiedadHorizontal',
+    'cuotaLeasingVehiculo', 'cuotaLeasingOficina', 'seguros', 'vestuario',
+    'recreacion', 'gastosPersonasCargo', 'otros'
+  ].reduce((sum, key) => sum + (parseFloat(watchedGastos?.[key]) || 0), 0);
+
   const disponibleParaPago = (parseFloat(watchedIngresos) || 0) - totalGastos;
 
   useEffect(() => {
