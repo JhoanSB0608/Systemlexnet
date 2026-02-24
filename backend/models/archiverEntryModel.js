@@ -5,8 +5,8 @@ const mongoose = require('mongoose');
 // ====================
 
 const anexoSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  url: { type: String, required: true },
+  name: { type: String },
+  url: { type: String },
   descripcion: { type: String },
   size: { type: Number }, // To store file size for display
 });

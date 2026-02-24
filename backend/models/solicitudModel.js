@@ -222,8 +222,8 @@ const causasSchema = new mongoose.Schema({
 });
 
 const anexoSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  url: { type: String, required: true },
+  name: { type: String },
+  url: { type: String },
   descripcion: { type: String },
   size: { type: Number }, // Added size field
 });
