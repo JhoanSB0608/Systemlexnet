@@ -61,7 +61,7 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
       >
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Añadir Descripción al Anexo
+            ¿Desea añadir una descripción al Anexo?
           </Typography>
           <IconButton onClick={handleClose}>
             <CloseIcon />
@@ -72,7 +72,7 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
         <TextField
           autoFocus
           margin="dense"
-          label="Descripción"
+          label="Descripción (Opcional)"
           type="text"
           fullWidth
           variant="outlined"
@@ -88,6 +88,9 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
       <DialogActions sx={{ p: 3, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
         <Button onClick={handleClose} color="inherit">
           Cancelar
+        </Button>
+        <Button onClick={() => onConfirm('')} color="primary">
+          Omitir descripción
         </Button>
         <Button onClick={handleConfirm} variant="contained" color="primary">
           Confirmar
@@ -157,24 +160,35 @@ export const ArchiverAnexosSection = ({ anexos, archiverEntryId, onUploadSuccess
 
   const handleDescriptionConfirm = async (description) => {
     setIsDescriptionModalOpen(false);
-    if (!currentFileToUpload || !archiverEntryId) return;
+    if (!description && !currentFileToUpload) return;
+    if (!archiverEntryId) return;
 
     setUploadingAnexo(true);
     try {
-        const { fileUrl, uniqueFilename } = await uploadFile(currentFileToUpload);
+        let fileUrl = '';
+        let uniqueFilename = '';
+        let fileSize = 0;
+
+        if (currentFileToUpload) {
+            const uploadResult = await uploadFile(currentFileToUpload);
+            fileUrl = uploadResult.fileUrl;
+            uniqueFilename = uploadResult.uniqueFilename;
+            fileSize = currentFileToUpload.size;
+        }
+
         const payload = {
-            name: uniqueFilename,
+            name: uniqueFilename || 'Nota de Texto',
             url: fileUrl,
             descripcion: description,
-            size: currentFileToUpload.size,
+            size: fileSize,
         };
 
         await uploadArchiverAnexo(archiverEntryId, payload);
 
-        showSuccess("Archivo subido con éxito");
+        showSuccess("Información guardada con éxito");
         onUploadSuccess();
     } catch (error) {
-        handleAxiosError(error, "Error al subir archivo a Google Cloud Storage.");
+        handleAxiosError(error, "Error al subir la información.");
     } finally {
         setUploadingAnexo(false);
         setCurrentFileToUpload(null);
@@ -182,6 +196,10 @@ export const ArchiverAnexosSection = ({ anexos, archiverEntryId, onUploadSuccess
   };
 
   const handleDownload = async (anexo) => {
+    if (!anexo.url) {
+        toast.info("Este anexo es solo una nota de texto.");
+        return;
+    }
     if (!anexo.name) {
         toast.error("Nombre del archivo no encontrado.");
         return;
@@ -209,28 +227,43 @@ export const ArchiverAnexosSection = ({ anexos, archiverEntryId, onUploadSuccess
         onChange={handleFileSelect}
         style={{ display: 'none' }}
       />
-      <Button
-        startIcon={uploadingAnexo ? <CircularProgress size={20} /> : <UploadFileIcon />}
-        variant="contained"
-        onClick={() => fileInputRef.current.click()}
-        disabled={uploadingAnexo || !archiverEntryId}
-        sx={{ 
-          mb: 3,
-          borderRadius: 3,
-          textTransform: 'none',
-          fontWeight: 600,
-          py: 1.5,
-          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-          boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-          },
-          transition: 'all 0.3s ease',
-        }}
-      >
-        {uploadingAnexo ? 'Subiendo...' : 'Subir Documento'}
-      </Button>
+      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+        <Button
+          startIcon={uploadingAnexo && currentFileToUpload ? <CircularProgress size={20} /> : <UploadFileIcon />}
+          variant="contained"
+          onClick={() => fileInputRef.current.click()}
+          disabled={uploadingAnexo || !archiverEntryId}
+          sx={{ 
+            borderRadius: 3,
+            textTransform: 'none',
+            fontWeight: 600,
+            py: 1.5,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+            },
+            transition: 'all 0.3s ease',
+          }}
+        >
+          {uploadingAnexo && currentFileToUpload ? 'Subiendo...' : 'Subir Documento'}
+        </Button>
+        <Button
+          startIcon={uploadingAnexo && !currentFileToUpload ? <CircularProgress size={20} /> : <DescriptionIcon />}
+          variant="outlined"
+          onClick={() => setIsDescriptionModalOpen(true)}
+          disabled={uploadingAnexo || !archiverEntryId}
+          sx={{ 
+            borderRadius: 3,
+            textTransform: 'none',
+            fontWeight: 600,
+            py: 1.5,
+          }}
+        >
+          {uploadingAnexo && !currentFileToUpload ? 'Guardando...' : 'Añadir Nota / Descripción'}
+        </Button>
+      </Stack>
       <Typography variant="caption" display="block" sx={{ mb: 2, color: theme.palette.text.secondary }}>
         {archiverEntryId ? '' : 'Guarde el formulario para poder subir anexos.'}
       </Typography>

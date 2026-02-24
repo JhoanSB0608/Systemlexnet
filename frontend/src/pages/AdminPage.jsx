@@ -846,35 +846,46 @@ const AnexosSection = ({ anexos, solicitudId, tipoSolicitud, onUploadSuccess }) 
 
   const handleDescriptionConfirm = async (description) => {
     setIsDescriptionModalOpen(false);
-    if (!currentFileToUpload) return;
+    if (!description && !currentFileToUpload) return;
 
     try {
-        console.log('AnexosSection: Starting file upload to GCS for:', currentFileToUpload.name, 'with description:', description);
-        const { fileUrl, uniqueFilename } = await fileStorageServiceUploadFile(currentFileToUpload);
-        console.log('AnexosSection: GCS upload successful. fileUrl:', fileUrl, 'uniqueFilename:', uniqueFilename);
+        let fileUrl = '';
+        let uniqueFilename = '';
+        let fileSize = 0;
+
+        if (currentFileToUpload) {
+            const uploadResult = await fileStorageServiceUploadFile(currentFileToUpload);
+            fileUrl = uploadResult.fileUrl;
+            uniqueFilename = uploadResult.uniqueFilename;
+            fileSize = currentFileToUpload.size;
+        }
+
         uploadFileToBackend({ 
             id: solicitudId, 
             tipo: tipoSolicitud.startsWith('Solicitud de Insolvencia') ? 'insolvencia' : 'conciliacion', 
-            filename: uniqueFilename,
+            filename: uniqueFilename || 'Nota de Texto',
             fileUrl: fileUrl,
-            description: description, // Pass the description
-            size: currentFileToUpload.size, // Pass the file size
+            description: description,
+            size: fileSize,
         });
     } catch (error) {
-        handleAxiosError(error, "Error al subir archivo a Google Cloud Storage.");
+        handleAxiosError(error, "Error al procesar la información.");
     } finally {
         setCurrentFileToUpload(null);
     }
   };
 
   const handleDownload = async (anexo) => {
-    console.log('AnexosSection: handleDownload triggered for anexo:', anexo);
-    if (!anexo.name) { // Corrected from anexo.filename to anexo.name
+    if (!anexo.url) {
+        toast.info("Este anexo es solo una nota de texto.");
+        return;
+    }
+    if (!anexo.name) {
         toast.error("Nombre del archivo no encontrado.");
         return;
     }
     try {
-      await downloadFile(anexo.name); // Corrected from anexo.filename to anexo.name
+      await downloadFile(anexo.name);
       toast.success(`Iniciando descarga de ${anexo.name}...`);
     } catch (error) {
       toast.error(`Error al descargar el archivo: ${error.message}`);
@@ -889,28 +900,43 @@ const AnexosSection = ({ anexos, solicitudId, tipoSolicitud, onUploadSuccess }) 
         onChange={handleFileSelect}
         style={{ display: 'none' }}
       />
-      <Button
-        startIcon={<CloudUploadIcon />}
-        variant="contained"
-        onClick={() => fileInputRef.current.click()}
-        disabled={isUploadingToBackend}
-        sx={{ 
-          mb: 3,
-          borderRadius: 3,
-          textTransform: 'none',
-          fontWeight: 600,
-          py: 1.5,
-          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-          boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-          },
-          transition: 'all 0.3s ease',
-        }}
-      >
-        {isUploadingToBackend ? 'Subiendo...' : 'Subir Documento'}
-      </Button>
+      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+        <Button
+            startIcon={isUploadingToBackend && currentFileToUpload ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+            variant="contained"
+            onClick={() => fileInputRef.current.click()}
+            disabled={isUploadingToBackend}
+            sx={{ 
+            borderRadius: 3,
+            textTransform: 'none',
+            fontWeight: 600,
+            py: 1.5,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+            '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+            },
+            transition: 'all 0.3s ease',
+            }}
+        >
+            {isUploadingToBackend && currentFileToUpload ? 'Subiendo...' : 'Subir Documento'}
+        </Button>
+        <Button
+            startIcon={isUploadingToBackend && !currentFileToUpload ? <CircularProgress size={20} /> : <DescriptionIcon />}
+            variant="outlined"
+            onClick={() => setIsDescriptionModalOpen(true)}
+            disabled={isUploadingToBackend}
+            sx={{ 
+            borderRadius: 3,
+            textTransform: 'none',
+            fontWeight: 600,
+            py: 1.5,
+            }}
+        >
+            {isUploadingToBackend && !currentFileToUpload ? 'Guardando...' : 'Añadir Nota / Descripción'}
+        </Button>
+      </Stack>
       <List>
         {anexos?.map((anexo, index) => (
           <ListItem 

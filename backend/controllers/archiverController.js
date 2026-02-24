@@ -77,8 +77,8 @@ const uploadArchiverAnexo = async (req, res) => {
   const { name, url, descripcion, size } = req.body; // Expect name, url, description, and size
   const user = req.user._id;
 
-  if (!name || !url) {
-    return res.status(400).json({ message: 'File name and URL are required.' });
+  if (!descripcion && (!name || !url)) {
+    return res.status(400).json({ message: 'File name and URL are required if no description is provided.' });
   }
 
   try {
@@ -87,7 +87,12 @@ const uploadArchiverAnexo = async (req, res) => {
       return res.status(404).json({ message: 'Archiver Entry not found or unauthorized.' });
     }
 
-    const newAnexo = { name, url, descripcion: descripcion || '', size };
+    const newAnexo = { 
+      name: name || 'Nota de Texto', 
+      url: url || '', 
+      descripcion: descripcion || '', 
+      size: size || 0 
+    };
 
     // Determine which anexos array to push to based on tipoSolicitud
     if (entry.tipoSolicitud === 'Solicitud de Insolvencia Económica') {

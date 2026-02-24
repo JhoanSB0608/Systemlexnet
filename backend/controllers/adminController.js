@@ -141,8 +141,8 @@ const uploadAnexo = async (req, res) => {
     const { tipo, id } = req.params;
     const { filename, fileUrl, descripcion, size } = req.body; // Expect filename, fileUrl, description, and size
 
-    if (!filename || !fileUrl) {
-      return res.status(400).json({ message: 'El nombre del archivo y la URL son requeridos.' });
+    if (!descripcion && (!filename || !fileUrl)) {
+      return res.status(400).json({ message: 'El nombre del archivo y la URL son requeridos si no hay una descripción.' });
     }
 
     let DocumentModel;
@@ -161,10 +161,10 @@ const uploadAnexo = async (req, res) => {
     }
 
     const newAnexo = {
-      name: filename, // Store the GCS object name
-      url: fileUrl,   // Store the GCS public URL
+      name: filename || 'Nota de Texto', // Store the GCS object name or placeholder
+      url: fileUrl || '',   // Store the GCS public URL or empty
       descripcion: descripcion || '',
-      size: size, // Store the size of the file
+      size: size || 0, // Store the size of the file
     };
 
     document.anexos.push(newAnexo);

@@ -241,7 +241,7 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
       >
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Añadir Descripción al Anexo
+            ¿Desea añadir una descripción al Anexo?
           </Typography>
           <IconButton onClick={handleClose}>
             <CloseIcon />
@@ -252,7 +252,7 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
         <TextField
           autoFocus
           margin="dense"
-          label="Descripción"
+          label="Descripción (Opcional)"
           type="text"
           fullWidth
           variant="outlined"
@@ -268,6 +268,9 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
       <DialogActions sx={{ p: 3, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
         <Button onClick={handleClose} color="inherit">
           Cancelar
+        </Button>
+        <Button onClick={() => onConfirm('')} color="primary">
+          Omitir descripción
         </Button>
         <Button onClick={handleConfirm} variant="contained" color="primary">
           Confirmar
@@ -616,6 +619,11 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
     const dataToSend = {
       ...correctedData,
+      anexos: (correctedData.anexos || []).map(anexo => ({
+        ...anexo,
+        name: anexo.url ? anexo.name : (anexo.descripcion ? 'Nota de Texto' : anexo.name),
+        url: anexo.url || '',
+      })),
       acreencias: (correctedData.acreencias || []).map(a => {
         const acreedorData = acreedoresData?.rows?.find(ac => ac._id === a.acreedor);
         return { ...a, acreedor: acreedorData };
@@ -4118,7 +4126,6 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                                         <Controller
                                             name={`anexos.${index}.url`}
                                             control={control}
-                                            rules={{ required: 'Debe seleccionar y subir un archivo.' }}
                                             render={({ field: controllerField, fieldState }) => (
                                                 <>
                                                     <Button
@@ -4126,14 +4133,14 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                                                         component="label"
                                                         disabled={isUploadingAnexo}
                                                         startIcon={isUploadingAnexo ? <CircularProgress size={20} /> : (controllerField.value ? <CheckCircleIcon /> : <UploadFileIcon />)}
-                                                        color={controllerField.value ? 'success' : (fieldState.error ? 'error' : 'primary')}
+                                                        color={controllerField.value ? 'success' : 'primary'}
                                                     >
                                                         {isUploadingAnexo ? 'Subiendo...' : (controllerField.value ? 'Subido' : 'Seleccionar Archivo')}
                                                         <input type="file" hidden onChange={(e) => handleAnexoChange(e, index)} onBlur={controllerField.onBlur} />
                                                     </Button>
                                                     <Box flexGrow={1}>
                                                         <Typography variant="body2" noWrap sx={{ color: fieldState.error ? 'error.main' : 'inherit' }}>
-                                                            {watch(`anexos.${index}.name`) || 'Ningún archivo seleccionado'}
+                                                            {watch(`anexos.${index}.name`) || 'Sin archivo (Opcional)'}
                                                         </Typography>
                                                         {fieldState.error && <FormHelperText error>{fieldState.error.message}</FormHelperText>}
                                                     </Box>
@@ -4143,8 +4150,8 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                                         <IconButton onClick={() => removeAnexo(index)} disabled={isUploadingAnexo}><DeleteIcon /></IconButton>
                                     </Stack>
                                     <GlassTextField
-                                        {...register(`anexos.${index}.descripcion`, { required: 'La descripción es requerida' })}
-                                        label="Descripción del Anexo"
+                                        {...register(`anexos.${index}.descripcion`)}
+                                        label="Descripción del Anexo (Opcional)"
                                         fullWidth
                                         InputLabelProps={{ shrink: true }}
                                         error={!!errors.anexos?.[index]?.descripcion}
