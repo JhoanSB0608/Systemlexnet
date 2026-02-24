@@ -88,7 +88,7 @@ const uploadArchiverAnexo = async (req, res) => {
     }
 
     const newAnexo = { 
-      name: name || 'Nota de Texto', 
+      name: name || ' ', 
       url: url || '', 
       descripcion: descripcion || '', 
       size: size || 0 

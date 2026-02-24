@@ -161,7 +161,7 @@ const uploadAnexo = async (req, res) => {
     }
 
     const newAnexo = {
-      name: filename || 'Nota de Texto', // Store the GCS object name or placeholder
+      name: filename || ' ', // Store the GCS object name or placeholder
       url: fileUrl || '',   // Store the GCS public URL or empty
       descripcion: descripcion || '',
       size: size || 0, // Store the size of the file

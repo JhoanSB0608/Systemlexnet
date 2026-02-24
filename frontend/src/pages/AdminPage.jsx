@@ -863,7 +863,7 @@ const AnexosSection = ({ anexos, solicitudId, tipoSolicitud, onUploadSuccess }) 
         uploadFileToBackend({ 
             id: solicitudId, 
             tipo: tipoSolicitud.startsWith('Solicitud de Insolvencia') ? 'insolvencia' : 'conciliacion', 
-            filename: uniqueFilename || 'Nota de Texto',
+            filename: uniqueFilename || ' ',
             fileUrl: fileUrl,
             description: description,
             size: fileSize,
@@ -877,7 +877,7 @@ const AnexosSection = ({ anexos, solicitudId, tipoSolicitud, onUploadSuccess }) 
 
   const handleDownload = async (anexo) => {
     if (!anexo.url) {
-        toast.info("Este anexo es solo una nota de texto.");
+        toast.info("Este anexo es solo una nota de texto. No se cargo un archivo previamente.");
         return;
     }
     if (!anexo.name) {

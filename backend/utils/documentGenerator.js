@@ -65,7 +65,6 @@ function buildDocDefinition(solicitud = {}) {
 
   const docDefinition = {
     pageSize: 'LEGAL',
-    // CORRECCIÓN: margen inferior reducido de 150 a 60 para evitar espacios en blanco excesivos
     pageMargins: [40, 60, 40, 60],
     defaultStyle: {
       font: 'Calibri',
@@ -365,19 +364,21 @@ function buildDocDefinition(solicitud = {}) {
     detalleRows.forEach(row => {
       body.push([
         { text: row[0], fontSize: 9, margin: [4, 2, 2, 2] },
-        { text: row[1], fontSize: 9, margin: [4, 2, 2, 2] }
+        { text: safe(row[1]), fontSize: 9, margin: [4, 2, 2, 2] }
       ]);
     });
 
-    // CORRECCIÓN: Eliminado unbreakable:true en tablas de acreencias grandes,
-    // ya que causa saltos de página abruptos con espacios enormes.
-    // En su lugar, se permite que la tabla fluya naturalmente entre páginas.
     c.push({
-      table: {
-        widths: ['*', '*'],
-        body
-      },
-      layout: standardTableLayout,
+      columns: [
+        {
+          width: '*',
+          table: {
+            widths: ['*', '*'],
+            body
+          },
+          layout: standardTableLayout,
+        }
+      ],
       margin: [15, 0, 0, 12]
     });
   });
@@ -443,13 +444,17 @@ function buildDocDefinition(solicitud = {}) {
       });
 
       c.push({
-        // CORRECCIÓN: unbreakable:true solo en tablas pequeñas (bienes muebles son cortos)
         unbreakable: true,
-        table: {
-          widths: ['*', '*'],
-          body
-        },
-        layout: standardTableLayout,
+        columns: [
+          {
+            width: '*',
+            table: {
+              widths: ['*', '*'],
+              body
+            },
+            layout: standardTableLayout,
+          }
+        ],
         margin: [15, 0, 0, 6]
       });
     });
@@ -458,27 +463,32 @@ function buildDocDefinition(solicitud = {}) {
 
     c.push({
       unbreakable: true,
-      table: {
-        widths: ['*', '*'],
-        body: [
-          [
-            {
-              text: 'Total Avalúo Comercial Estimado de Bienes Muebles',
-              bold: true,
-              fontSize: 9,
-              alignment: 'center',
-              margin: [0, 3, 0, 3],
-              colSpan: 2
-            },
-            {}
-          ],
-          [
-            { text: 'Total', bold: true, fontSize: 9, margin: [4, 2, 2, 2] },
-            { text: formatCurrency(totalAvaluo), bold: true, fontSize: 9, alignment: 'right', margin: [4, 2, 2, 2] }
-          ]
-        ]
-      },
-      layout: standardTableLayout,
+      columns: [
+        {
+          width: '*',
+          table: {
+            widths: ['*', '*'],
+            body: [
+              [
+                {
+                  text: 'Total Avalúo Comercial Estimado de Bienes Muebles',
+                  bold: true,
+                  fontSize: 9,
+                  alignment: 'center',
+                  margin: [0, 3, 0, 3],
+                  colSpan: 2
+                },
+                {}
+              ],
+              [
+                { text: 'Total', bold: true, fontSize: 9, margin: [4, 2, 2, 2] },
+                { text: formatCurrency(totalAvaluo), bold: true, fontSize: 9, alignment: 'right', margin: [4, 2, 2, 2] }
+              ]
+            ]
+          },
+          layout: standardTableLayout,
+        }
+      ],
       margin: [15, 0, 0, 4]
     });
 
@@ -537,14 +547,18 @@ function buildDocDefinition(solicitud = {}) {
         ]);
       });
 
-      // CORRECCIÓN: Añadido unbreakable:true también en bienes inmuebles (omitido en original)
       c.push({
         unbreakable: true,
-        table: {
-          widths: ['*', '*'],
-          body
-        },
-        layout: standardTableLayout,
+        columns: [
+          {
+            width: '*',
+            table: {
+              widths: ['*', '*'],
+              body
+            },
+            layout: standardTableLayout,
+          }
+        ],
         margin: [15, 0, 0, 6]
       });
     });
@@ -553,27 +567,32 @@ function buildDocDefinition(solicitud = {}) {
 
     c.push({
       unbreakable: true,
-      table: {
-        widths: ['*', '*'],
-        body: [
-          [
-            {
-              text: 'Total Avalúo Comercial Estimado de Bienes Inmuebles',
-              bold: true,
-              fontSize: 9,
-              alignment: 'center',
-              margin: [0, 3, 0, 3],
-              colSpan: 2
-            },
-            {}
-          ],
-          [
-            { text: 'Total', bold: true, fontSize: 9, margin: [4, 2, 2, 2] },
-            { text: formatCurrency(totalAvaluoInmuebles), bold: true, fontSize: 9, alignment: 'right', margin: [4, 2, 2, 2] }
-          ]
-        ]
-      },
-      layout: standardTableLayout,
+      columns: [
+        {
+          width: '*',
+          table: {
+            widths: ['*', '*'],
+            body: [
+              [
+                {
+                  text: 'Total Avalúo Comercial Estimado de Bienes Inmuebles',
+                  bold: true,
+                  fontSize: 9,
+                  alignment: 'center',
+                  margin: [0, 3, 0, 3],
+                  colSpan: 2
+                },
+                {}
+              ],
+              [
+                { text: 'Total', bold: true, fontSize: 9, margin: [4, 2, 2, 2] },
+                { text: formatCurrency(totalAvaluoInmuebles), bold: true, fontSize: 9, alignment: 'right', margin: [4, 2, 2, 2] }
+              ]
+            ]
+          },
+          layout: standardTableLayout,
+        }
+      ],
       margin: [15, 0, 0, 6]
     });
   }
@@ -632,11 +651,16 @@ function buildDocDefinition(solicitud = {}) {
 
       c.push({
         unbreakable: true,
-        table: {
-          widths: ['*', '*'],
-          body
-        },
-        layout: standardTableLayout,
+        columns: [
+          {
+            width: '*',
+            table: {
+              widths: ['*', '*'],
+              body
+            },
+            layout: standardTableLayout,
+          }
+        ],
         margin: [15, 0, 0, 8]
       });
     });
@@ -698,11 +722,16 @@ function buildDocDefinition(solicitud = {}) {
 
       c.push({
         unbreakable: true,
-        table: {
-          widths: ['*', '*'],
-          body
-        },
-        layout: standardTableLayout,
+        columns: [
+          {
+            width: '*',
+            table: {
+              widths: ['*', '*'],
+              body
+            },
+            layout: standardTableLayout,
+          }
+        ],
         margin: [15, 0, 0, 8]
       });
     });
@@ -779,11 +808,16 @@ function buildDocDefinition(solicitud = {}) {
 
   c.push({
     unbreakable: true,
-    table: {
-      widths: ['*', '*'],
-      body: bodyGastos
-    },
-    layout: standardTableLayout,
+    columns: [
+      {
+        width: '*',
+        table: {
+          widths: ['*', '*'],
+          body: bodyGastos
+        },
+        layout: standardTableLayout,
+      }
+    ],
     margin: [15, 0, 0, 6]
   });
 
@@ -845,11 +879,16 @@ function buildDocDefinition(solicitud = {}) {
 
   c.push({
     unbreakable: true,
-    table: {
-      widths: ['*', '*'],
-      body: bodyIngresos
-    },
-    layout: standardTableLayout,
+    columns: [
+      {
+        width: '*',
+        table: {
+          widths: ['*', '*'],
+          body: bodyIngresos
+        },
+        layout: standardTableLayout,
+      }
+    ],
     margin: [15, 0, 0, 6]
   });
 
@@ -906,11 +945,16 @@ function buildDocDefinition(solicitud = {}) {
 
   c.push({
     unbreakable: true,
-    table: {
-      widths: ['*', '*'],
-      body: conyugalRows
-    },
-    layout: standardTableLayout,
+    columns: [
+      {
+        width: '*',
+        table: {
+          widths: ['*', '*'],
+          body: conyugalRows
+        },
+        layout: standardTableLayout,
+      }
+    ],
     margin: [15, 0, 0, 10]
   });
 
@@ -990,8 +1034,13 @@ function buildDocDefinition(solicitud = {}) {
 
         c.push({
           unbreakable: true,
-          table: { widths: ['*', '*'], body: detalleBody },
-          layout: standardTableLayout,
+          columns: [
+            {
+              width: '*',
+              table: { widths: ['*', '*'], body: detalleBody },
+              layout: standardTableLayout,
+            }
+          ],
           margin: [15, 0, 0, 8]
         });
 
@@ -1046,11 +1095,16 @@ function buildDocDefinition(solicitud = {}) {
 
         c.push({
           unbreakable: true,
-          table: {
-            widths: ['*', 120, 90, 50, 90],
-            body: distribBody
-          },
-          layout: standardTableLayout,
+          columns: [
+            {
+              width: '*',
+              table: {
+                widths: ['*', 120, 90, 50, 90],
+                body: distribBody
+              },
+              layout: standardTableLayout,
+            }
+          ],
           margin: [15, 0, 0, 8]
         });
 
@@ -1119,11 +1173,16 @@ function buildDocDefinition(solicitud = {}) {
         // CORRECCIÓN: La tabla de proyección NO lleva unbreakable:true ya que puede ser
         // muy larga (125 filas). Se deja fluir naturalmente entre páginas.
         c.push({
-          table: {
-            widths: [25, '*', '*', '*', '*', '*', 30, '*'],
-            body: proyeccionBody
-          },
-          layout: standardTableLayout,
+          columns: [
+            {
+              width: '*',
+              table: {
+                widths: [25, '*', '*', '*', '*', '*', 30, '*'],
+                body: proyeccionBody
+              },
+              layout: standardTableLayout,
+            }
+          ],
           margin: [15, 0, 0, 10]
         });
       }

@@ -621,7 +621,7 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       ...correctedData,
       anexos: (correctedData.anexos || []).map(anexo => ({
         ...anexo,
-        name: anexo.url ? anexo.name : (anexo.descripcion ? 'Nota de Texto' : anexo.name),
+        name: anexo.url ? anexo.name : (anexo.descripcion ? ' ' : anexo.name),
         url: anexo.url || '',
       })),
       acreencias: (correctedData.acreencias || []).map(a => {

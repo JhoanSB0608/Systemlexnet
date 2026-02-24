@@ -549,7 +549,7 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
       ...data,
       anexos: (data.anexos || []).map(anexo => ({
         ...anexo,
-        name: anexo.url ? anexo.name : (anexo.descripcion ? 'Nota de Texto' : anexo.name),
+        name: anexo.url ? anexo.name : (anexo.descripcion ? ' ' : anexo.name),
         url: anexo.url || '',
       })),
     };

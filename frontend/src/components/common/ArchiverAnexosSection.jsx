@@ -177,7 +177,7 @@ export const ArchiverAnexosSection = ({ anexos, archiverEntryId, onUploadSuccess
         }
 
         const payload = {
-            name: uniqueFilename || 'Nota de Texto',
+            name: uniqueFilename || ' ',
             url: fileUrl,
             descripcion: description,
             size: fileSize,
