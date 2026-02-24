@@ -174,10 +174,16 @@ function buildDocDefinition(solicitud = {}) {
     `TOME LA DECISIÓN DE ADQUIRIR LOS DISTINTOS CRÉDITOS CON EL OBJETIVO DE MEJORAR MI CALIDAD DE VIDA Y LA MI FAMILIA, ADEMÁS DE QUERER GENERAR INGRESOS EXTRAS POR ELLO DECIDÍ INVERTIR EN UNA MONEDA DIGITAL QUE OFRECÍA GRAN RENTABILIDAD DE GANANCIAS, SIN EMBARGO, CON EL TIEMPO DESAFORTUNADAMENTE LA PLATAFORMA DE DICHA MONEDA DESAPARECIÓ SIN GENERAR ALGÚN TIPO DE GANANCIA, POR LO QUE EL DINERO ALLÍ INVERTIDO SE PERDIÓ Y ACTUALMENTE NO CUENTO CON LA CAPACIDAD DE PAGO PARA CUMPLIR EN DEBIDA FORMA CON MIS OBLIGACIONES CREDITICIAS, YA QUE LO DEVENGADO SOLO ES SUFICIENTE PARA MIS GASTOS PERSONALES Y FAMILIARES, POR ELLO, ME ENCUENTRO EN MORA EN LA MAYORÍA DE ELLAS E INICIO EL PRESENTE PROCESO`;
 
   c.push({
-    text: causasTexto.toUpperCase(),
-    fontSize: 9,
-    alignment: 'justify',
-    margin: [15, 0, 0, 12]
+    columns: [
+      { width: 15, text: '' },
+      {
+        text: causasTexto.toUpperCase(),
+        fontSize: 9,
+        alignment: 'justify',
+        width: '*'
+      }
+    ],
+    margin: [0, 0, 0, 12]
   });
 
   // ========== 2. RESUMEN DE ACREENCIAS ==========
@@ -289,12 +295,18 @@ function buildDocDefinition(solicitud = {}) {
   ]);
 
   c.push({
-    table: {
-      widths: ['*', 65, 55, 55, 55, 55, 55],
-      body: resumenRows
-    },
-    layout: standardTableLayout,
-    margin: [15, 0, 0, 12]
+    columns: [
+      { width: 15, text: '' },
+      {
+        width: '*',
+        table: {
+          widths: ['*', 65, 55, 55, 55, 55, 55],
+          body: resumenRows
+        },
+        layout: standardTableLayout
+      }
+    ],
+    margin: [0, 0, 0, 12]
   });
 
   // ========== 3. DETALLE DE ACREENCIAS ==========
@@ -369,12 +381,18 @@ function buildDocDefinition(solicitud = {}) {
     });
 
     c.push({
-      table: {
-        widths: ['*', '*'],
-        body
-      },
-      layout: standardTableLayout,
-      margin: [15, 0, 0, 12]
+      columns: [
+        { width: 15, text: '' },
+        {
+          width: '*',
+          table: {
+            widths: ['*', '*'],
+            body
+          },
+          layout: standardTableLayout,
+        }
+      ],
+      margin: [0, 0, 0, 12]
     });
   });
 
