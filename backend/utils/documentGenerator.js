@@ -369,16 +369,11 @@ function buildDocDefinition(solicitud = {}) {
     });
 
     c.push({
-      columns: [
-        {
-          width: '*',
-          table: {
-            widths: ['*', '*'],
-            body
-          },
-          layout: standardTableLayout,
-        }
-      ],
+      table: {
+        widths: ['*', '*'],
+        body
+      },
+      layout: standardTableLayout,
       margin: [15, 0, 0, 12]
     });
   });
@@ -1034,13 +1029,8 @@ function buildDocDefinition(solicitud = {}) {
 
         c.push({
           unbreakable: true,
-          columns: [
-            {
-              width: '*',
-              table: { widths: ['*', '*'], body: detalleBody },
-              layout: standardTableLayout,
-            }
-          ],
+          table: { widths: ['*', '*'], body: detalleBody },
+          layout: standardTableLayout,
           margin: [15, 0, 0, 8]
         });
 
@@ -1095,16 +1085,11 @@ function buildDocDefinition(solicitud = {}) {
 
         c.push({
           unbreakable: true,
-          columns: [
-            {
-              width: '*',
-              table: {
-                widths: ['*', 120, 90, 50, 90],
-                body: distribBody
-              },
-              layout: standardTableLayout,
-            }
-          ],
+          table: {
+            widths: ['*', 120, 90, 50, 90],
+            body: distribBody
+          },
+          layout: standardTableLayout,
           margin: [15, 0, 0, 8]
         });
 
@@ -1173,16 +1158,11 @@ function buildDocDefinition(solicitud = {}) {
         // CORRECCIÓN: La tabla de proyección NO lleva unbreakable:true ya que puede ser
         // muy larga (125 filas). Se deja fluir naturalmente entre páginas.
         c.push({
-          columns: [
-            {
-              width: '*',
-              table: {
-                widths: [25, '*', '*', '*', '*', '*', 30, '*'],
-                body: proyeccionBody
-              },
-              layout: standardTableLayout,
-            }
-          ],
+          table: {
+            widths: [25, '*', '*', '*', '*', '*', 30, '*'],
+            body: proyeccionBody
+          },
+          layout: standardTableLayout,
           margin: [15, 0, 0, 10]
         });
       }
