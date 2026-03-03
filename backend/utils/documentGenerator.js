@@ -550,7 +550,7 @@ function buildDocDefinition(solicitud = {}) {
         ['Dirección', safe(b.direccion)],
         ['Ciudad', safe(b.ciudad)],
         ['Avalúo Comercial', formatCurrency(b.avaluoComercial)],
-        ['Afectado a Vivienda Familiar', b.afectadoVivienda ? 'SI' : 'NO']
+        ['Afectado a Vivienda Familiar', b.afectadoViviendaFamiliar === true || b.afectadoViviendaFamiliar === 'true' ? 'SI' : 'NO']
       ];
 
       rows.forEach(r => {
@@ -652,7 +652,8 @@ function buildDocDefinition(solicitud = {}) {
         ['Valor', formatCurrency(p.valor)],
         ['Departamento', safe(p.departamento)],
         ['Ciudad', safe(p.ciudad)],
-        ['Dirección Juzgado', safe(p.direccionJuzgado)]
+        ['Dirección Juzgado', safe(p.direccionJuzgado)],
+        ['Correo Electrónico', safe(p.emailJuzgado)]
       ];
 
       detalleRows.forEach(row => {
