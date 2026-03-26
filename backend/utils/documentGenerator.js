@@ -446,8 +446,16 @@ function buildDocDefinition(solicitud = {}) {
         ['Descripción', safe(b.descripcion)],
         ['Clasificación', safe(b.clasificacion)],
         ['Marca', safe(b.marca)],
-        ['Avalúo Comercial Estimado', formatCurrency(b.avaluoComercial)]
       ];
+
+      if (b.clasificacion === 'Vehiculo') {
+        rows.push(['Modelo', safe(b.modelo)]);
+        rows.push(['Placa', safe(b.placa)]);
+        rows.push(['Tarjeta de Propiedad', safe(b.tarjetaPropiedad)]);
+        rows.push(['Oficina de Tránsito', safe(b.oficinaTransito)]);
+      }
+
+      rows.push(['Avalúo Comercial Estimado', formatCurrency(b.avaluoComercial)]);
 
       rows.forEach(r => {
         body.push([

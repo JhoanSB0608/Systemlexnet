@@ -331,8 +331,16 @@ const tableRows = detalleData.map(
             ['Descripción', safe(b.descripcion)],
             ['Clasificación', safe(b.clasificacion)],
             ['Marca', safe(b.marca)],
-            ['Avalúo Comercial Estimado', formatCurrency(b.avaluoComercial)]
         ];
+
+        if (b.clasificacion === 'Vehiculo') {
+            bienData.push(['Modelo', safe(b.modelo)]);
+            bienData.push(['Placa', safe(b.placa)]);
+            bienData.push(['Tarjeta de Propiedad', safe(b.tarjetaPropiedad)]);
+            bienData.push(['Oficina de Tránsito', safe(b.oficinaTransito)]);
+        }
+
+        bienData.push(['Avalúo Comercial Estimado', formatCurrency(b.avaluoComercial)]);
         const tableRows = bienData.map(([label, value]) => new TableRow({ children: [createCell([createParagraph([createTextRun(label)])]), createCell([createParagraph([createTextRun(value)])])] }));
         tableRows.unshift(new TableRow({ children: [createCell([createParagraph([createTextRun(`Bien Mueble No. ${i + 1}`, { bold: true })], { alignment: AlignmentType.CENTER })], { columnSpan: 2 })] }));
         children.push(createBorderedTable(tableRows, [50, 50]));
