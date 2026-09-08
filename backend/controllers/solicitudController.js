@@ -38,18 +38,37 @@ const updateSolicitud = async (req, res) => {
     }
     
     // The incoming request body is now the source of truth, containing all data including GCS urls for anexos.
-    const dataToUpdate = req.body;
+    const dataToUpdate = { ...req.body };
+
+    // Proteger integridad: el usuario/cliente no puede reasignar el dueño del documento
+    delete dataToUpdate.user;
+    delete dataToUpdate._id;
+
+    // Soportar el cambio de estado (borrador -> completa) al finalizar
+    if (dataToUpdate.estado === 'borrador' || dataToUpdate.estado === 'completa') {
+      solicitud.estado = dataToUpdate.estado;
+    }
+    delete dataToUpdate.estado;
+
+    if (dataToUpdate.seccionesGuardadas) {
+      solicitud.seccionesGuardadas = dataToUpdate.seccionesGuardadas;
+    }
+    delete dataToUpdate.seccionesGuardadas;
 
     // Directly assign the data from the request body to the Mongoose document.
     // Mongoose is smart enough to handle the nested schemas.
     solicitud.set(dataToUpdate);
-    
+
     // The 'anexos' array from the client contains the full, correct state of all annexes.
-    // By assigning it directly, Mongoose will handle the update.
-    solicitud.anexos = dataToUpdate.anexos || [];
-    
+    // Only overwrite when explicitly sent, so partial saves (deborrador) don't wipe them.
+    if ('anexos' in dataToUpdate) {
+      solicitud.anexos = dataToUpdate.anexos || [];
+    }
+
     // The 'firma' object is also handled directly.
-    solicitud.firma = dataToUpdate.firma;
+    if ('firma' in dataToUpdate) {
+      solicitud.firma = dataToUpdate.firma;
+    }
 
     // Construct nombreCompleto for the deudor just in case it changed
     if (solicitud.deudor) {
@@ -78,11 +97,132 @@ const updateSolicitud = async (req, res) => {
 
 const getMisSolicitudes = async (req, res) => {
   try {
-    const solicitudes = await Solicitud.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const query = { user: req.user._id };
+    // Filtro opcional: /api/solicitudes?estado=borrador | completa
+    if (req.query.estado) {
+      query.estado = req.query.estado;
+    }
+    const solicitudes = await Solicitud.find(query).sort({ updatedAt: -1 });
     res.json(solicitudes);
   } catch (error) {
     console.error('Error al obtener las solicitudes del usuario:', error);
     res.status(500).json({ message: 'Error del servidor' });
+  }
+};
+
+// Reutilizable para construir el nombre completo del deudor
+const buildDeudorNombreCompleto = (deudor) => {
+  if (!deudor) return;
+  deudor.nombreCompleto = [
+    deudor.primerNombre,
+    deudor.segundoNombre,
+    deudor.primerApellido,
+    deudor.segundoApellido
+  ].filter(Boolean).join(' ');
+};
+
+// POST /api/solicitudes/borrador
+// Crea un borrador nuevo, o reutiliza el último borrador activo del mismo tipo (upsert).
+// Esto permite "pausar y retomar" la solicitud en progreso.
+const saveBorrador = async (req, res) => {
+  console.log("[solicitudController] saveBorrador - body:", JSON.stringify(req.body, null, 2));
+  try {
+    const data = { ...req.body };
+    const { tipoSolicitud } = data;
+
+    let borrador = await Solicitud.findOne({
+      user: req.user._id,
+      estado: 'borrador',
+      tipoSolicitud: tipoSolicitud || { $exists: true },
+    }).sort({ updatedAt: -1 });
+
+    if (!borrador) {
+      borrador = new Solicitud({
+        user: req.user._id,
+        estado: 'borrador',
+        tipoSolicitud: tipoSolicitud || 'Solicitud de Insolvencia Económica de Persona Natural No Comerciante',
+      });
+    }
+
+    delete data.user;
+    delete data._id;
+    delete data.estado;
+
+    buildDeudorNombreCompleto(data.deudor);
+    borrador.set(data);
+
+    // Solo sobrescribir anexos/firma/secciones si vienen en la petición (el guardado es parcial)
+    if ('anexos' in data) borrador.anexos = data.anexos || [];
+    if ('firma' in data) borrador.firma = data.firma;
+    if ('seccionesGuardadas' in data) borrador.seccionesGuardadas = data.seccionesGuardadas;
+
+    const saved = await borrador.save();
+    res.json(saved);
+  } catch (error) {
+    console.error('Error al guardar el borrador:', error);
+    res.status(400).json({
+      message: 'Error al guardar el borrador.',
+      error: error.errors ? Object.values(error.errors).map(e => e.message) : error.message,
+    });
+  }
+};
+
+// PUT /api/solicitudes/borrador/:id
+const updateBorrador = async (req, res) => {
+  console.log(`[solicitudController] updateBorrador ${req.params.id} - body:`, JSON.stringify(req.body, null, 2));
+  try {
+    const borrador = await Solicitud.findById(req.params.id);
+
+    if (!borrador) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
+    const isOwner = borrador.user && borrador.user.toString() === req.user._id.toString();
+    if (!isOwner && !req.user.isAdmin) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
+    if (borrador.estado !== 'borrador') {
+      return res.status(400).json({ message: 'La solicitud ya fue completada y no puede guardarse como borrador.' });
+    }
+
+    const data = { ...req.body };
+    delete data.user;
+    delete data._id;
+    delete data.estado;
+
+    buildDeudorNombreCompleto(data.deudor);
+    borrador.set(data);
+
+    if ('anexos' in data) borrador.anexos = data.anexos || [];
+    if ('firma' in data) borrador.firma = data.firma;
+    if ('seccionesGuardadas' in data) borrador.seccionesGuardadas = data.seccionesGuardadas;
+
+    const saved = await borrador.save();
+    res.json(saved);
+  } catch (error) {
+    console.error('Error al actualizar el borrador:', error);
+    res.status(400).json({
+      message: 'Error al actualizar el borrador.',
+      error: error.errors ? Object.values(error.errors).map(e => e.message) : error.message,
+    });
+  }
+};
+
+// DELETE /api/solicitudes/borrador/:id
+const deleteBorrador = async (req, res) => {
+  try {
+    const borrador = await Solicitud.findById(req.params.id);
+    if (!borrador) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
+    const isOwner = borrador.user && borrador.user.toString() === req.user._id.toString();
+    if (!isOwner && !req.user.isAdmin) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
+    await borrador.deleteOne();
+    res.json({ message: 'Borrador eliminado', id: req.params.id });
+  } catch (error) {
+    console.error('Error al eliminar el borrador:', error);
+    res.status(500).json({ message: 'Error del servidor al eliminar el borrador.' });
   }
 };
 
@@ -210,4 +350,4 @@ const getSolicitudDocumento = async (req, res) => {
   }
 };
 
-module.exports = { createSolicitud, getSolicitudDocumento, getMisSolicitudes, getSolicitudById, updateSolicitud };
+module.exports = { createSolicitud, getSolicitudDocumento, getMisSolicitudes, getSolicitudById, updateSolicitud, saveBorrador, updateBorrador, deleteBorrador };

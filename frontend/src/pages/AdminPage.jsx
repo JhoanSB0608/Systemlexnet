@@ -1664,6 +1664,24 @@ const AdminPage = () => {
       }
     },
     {
+      accessorKey: 'estado',
+      header: 'Estado',
+      cell: ({ getValue }) => {
+        const estado = getValue();
+        // Old documents without estado field are treated as completed
+        const isDraft = estado === 'borrador';
+        return (
+          <Chip
+            label={isDraft ? 'Borrador' : 'Completado'}
+            size="small"
+            color={isDraft ? 'warning' : 'success'}
+            variant={isDraft ? 'outlined' : 'filled'}
+            sx={{ fontWeight: 600 }}
+          />
+        );
+      }
+    },
+    {
         id: 'deudor',
         header: 'Deudor/a',
         cell: ({ row }) => {
@@ -1724,24 +1742,55 @@ const AdminPage = () => {
       header: 'Acciones',
       cell: ({ row }) => {
         const { original } = row;
+        const isDraft = original.estado === 'borrador';
         return (
             <Stack direction="row" spacing={1}>
                 {original.tipoSolicitud.startsWith('Solicitud de Insolvencia') && (
-                    <Tooltip title="Editar Solicitud de Insolvencia">
-                        <IconButton onClick={() => navigate(`/admin/editar-solicitud/${original._id}`)}><EditIcon /></IconButton>
+                  isDraft ? (
+                    <Tooltip title="Continuar borrador de Insolvencia">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => navigate(`/admin/editar-solicitud/${original._id}`)}
+                        sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, fontSize: '0.75rem' }}
+                      >
+                        Continuar
+                      </Button>
                     </Tooltip>
+                  ) : (
+                    <Tooltip title="Editar Solicitud de Insolvencia">
+                      <IconButton onClick={() => navigate(`/admin/editar-solicitud/${original._id}`)}><EditIcon /></IconButton>
+                    </Tooltip>
+                  )
                 )}
                 {original.tipoSolicitud.startsWith('Solicitud de Conciliación') && (
-                    <Tooltip title="Editar Solicitud de Conciliación">
-                        <IconButton onClick={() => navigate(`/admin/editar-conciliacion/${original._id}`)}><EditIcon /></IconButton>
+                  isDraft ? (
+                    <Tooltip title="Continuar borrador de Conciliación">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => navigate(`/admin/editar-conciliacion/${original._id}`)}
+                        sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, fontSize: '0.75rem' }}
+                      >
+                        Continuar
+                      </Button>
                     </Tooltip>
+                  ) : (
+                    <Tooltip title="Editar Solicitud de Conciliación">
+                      <IconButton onClick={() => navigate(`/admin/editar-conciliacion/${original._id}`)}><EditIcon /></IconButton>
+                    </Tooltip>
+                  )
                 )}
-                <Tooltip title="Descargar PDF">
-                    <IconButton onClick={() => handleDownload(original._id, original.tipoSolicitud, 'pdf')}><PictureAsPdf /></IconButton>
-                </Tooltip>
-                <Tooltip title="Descargar DOCX">
-                    <IconButton onClick={() => handleDownload(original._id, original.tipoSolicitud, 'docx')}><DescriptionIcon /></IconButton>
-                </Tooltip>
+                {!isDraft && (
+                  <>
+                    <Tooltip title="Descargar PDF">
+                      <IconButton onClick={() => handleDownload(original._id, original.tipoSolicitud, 'pdf')}><PictureAsPdf /></IconButton>
+                    </Tooltip>
+                    <Tooltip title="Descargar DOCX">
+                      <IconButton onClick={() => handleDownload(original._id, original.tipoSolicitud, 'docx')}><DescriptionIcon /></IconButton>
+                    </Tooltip>
+                  </>
+                )}
             </Stack>
         )
       }
@@ -1990,16 +2039,6 @@ const AdminPage = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             borderRadius: 3,
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              '& .MuiOutlinedInput-notchedOutline': {
-                                borderColor: alpha(theme.palette.primary.main, 0.5),
-                              }
-                            },
-                            '&.Mui-focused': {
-                              transform: 'translateY(-2px)',
-                              boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.15)}`,
-                            }
                           }
                         }}
                       />
@@ -2022,16 +2061,6 @@ const AdminPage = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             borderRadius: 3,
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              '& .MuiOutlinedInput-notchedOutline': {
-                                borderColor: alpha(theme.palette.primary.main, 0.5),
-                              }
-                            },
-                            '&.Mui-focused': {
-                              transform: 'translateY(-2px)',
-                              boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.15)}`,
-                            }
                           }
                         }}
                       />

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Button, Typography, Box, Stack, Avatar, IconButton, CircularProgress, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, useTheme, alpha, List, Paper
+  DialogContent, DialogActions, TextField, useTheme, alpha, List
 } from '@mui/material';
 import {
   Description as DescriptionIcon,
@@ -13,6 +13,7 @@ import { uploadFile, downloadFile } from '../../services/fileStorageService';
 import { showSuccess, handleAxiosError } from '../../utils/alert';
 import { toast } from 'react-toastify';
 import { uploadArchiverAnexo } from '../../services/archiverService';
+import GlassCard from './GlassCard';
 
 // Reusable Description Modal component
 const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
@@ -97,48 +98,6 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
         </Button>
       </DialogActions>
     </Dialog>
-  );
-};
-
-const GlassCard = ({ children, sx = {}, hover = true, ...props }) => { // Re-defining GlassCard for self-containment
-  const [, setIsHovered] = useState(false);
-
-  return (
-    <Paper
-      elevation={0}
-      onMouseEnter={() => hover && setIsHovered(true)}
-      onMouseLeave={() => hover && setIsHovered(false)}
-      sx={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        borderRadius: '16px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'relative',
-        overflow: 'hidden',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '1px',
-          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)',
-        },
-        ...(hover && {
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15)',
-          }
-        }),
-        ...sx
-      }}
-      {...props}
-    >
-      {children}
-    </Paper>
   );
 };
 

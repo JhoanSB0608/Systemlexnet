@@ -9,15 +9,19 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret'); // Clave unificada
       req.user = await User.findById(decoded.id).select('-password');
+      if (!req.user) {
+        res.status(401);
+        return next(new Error('No autorizado, el usuario ya no existe'));
+      }
       next();
     } catch (error) {
       console.error(error);
       res.status(401);
-      throw new Error('No autorizado, el token falló');
+      return next(new Error('No autorizado, el token falló'));
     }
   } else {
     res.status(401);
-    throw new Error('No autorizado, no hay token');
+    return next(new Error('No autorizado, no hay token'));
   }
 };
 
@@ -26,7 +30,7 @@ const admin = (req, res, next) => {
     next();
   } else {
     res.status(401);
-    throw new Error('No autorizado como administrador');
+    return next(new Error('No autorizado como administrador'));
   }
 };
 

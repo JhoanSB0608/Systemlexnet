@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Select, MenuItem, FormControl, InputLabel, Typography, Box, Alert, AlertTitle,
-  Collapse, Button, Stack, Container, Paper, alpha, useTheme, Fade, Grow, Avatar,
+  Collapse, Button, Stack, Container, alpha, useTheme, Fade, Grow, Avatar,
   Chip, IconButton, Tooltip, CircularProgress
 } from '@mui/material';
 import {
@@ -18,58 +18,14 @@ import { createArchiverEntry, getArchiverEntryById } from '../services/archiverS
 import { showSuccess, handleAxiosError } from '../utils/alert';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import SharedGlassCard from '../components/common/GlassCard';
 
-// Glassmorphism Card Component (reused)
-const GlassCard = React.forwardRef(({ children, sx = {}, hover = true, ...props }, ref) => {
-  const [, setIsHovered] = useState(false);
-  
-  return (
-    <Paper
-      ref={ref}
-      elevation={0}
-      onMouseEnter={() => hover && setIsHovered(true)}
-      onMouseLeave={() => hover && setIsHovered(false)}
-      sx={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%)',
-        backdropFilter: 'blur(25px)',
-        WebkitBackdropFilter: 'blur(25px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        borderRadius: '20px',
-        boxShadow: `
-          0 8px 32px rgba(0, 0, 0, 0.1),
-          inset 0 1px 0 rgba(255, 255, 255, 0.2),
-          0 0 0 1px rgba(255, 255, 255, 0.05)
-        `,
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'relative',
-        overflow: 'hidden',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '1px',
-          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)',
-        },
-        ...(hover && {
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: `
-              0 12px 40px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.1)
-            `,
-          }
-        }),
-        ...sx
-      }}
-      {...props}
-    >
-      {children}
-    </Paper>
-  );
-});
+// Glassmorphism Card Component (shared theme-aware)
+const GlassCard = React.forwardRef(({ children, ...props }, ref) => (
+  <SharedGlassCard ref={ref} {...props}>
+    {children}
+  </SharedGlassCard>
+));
 
 // Unified list of request types with metadata
 const tiposDeSolicitud = [

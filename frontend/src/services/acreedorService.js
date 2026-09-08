@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'https://api.systemlex.com.co/api/acreedores';
+import { API_BASE_URL } from './userService';
+
+const API_URL = `${API_BASE_URL}/api/acreedores`;
 
 // Helper para obtener el token y la configuración
 const getConfig = (options = {}) => {

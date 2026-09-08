@@ -131,14 +131,32 @@ const updateConciliacion = async (req, res) => {
     }
     
     // The incoming request body is now the source of truth.
-    const dataToUpdate = req.body;
+    const dataToUpdate = { ...req.body };
+    delete dataToUpdate.user;
+    delete dataToUpdate._id;
+
+    // Soportar el cambio de estado (borrador -> completa) al finalizar
+    if (dataToUpdate.estado === 'borrador' || dataToUpdate.estado === 'completa') {
+      conciliacion.estado = dataToUpdate.estado;
+    }
+    delete dataToUpdate.estado;
+
+    if (dataToUpdate.seccionesGuardadas) {
+      conciliacion.seccionesGuardadas = dataToUpdate.seccionesGuardadas;
+    }
+    delete dataToUpdate.seccionesGuardadas;
 
     // Directly assign the data from the request body to the Mongoose document.
     conciliacion.set(dataToUpdate);
 
     // The 'anexos' and 'firma' arrays from the client are the source of truth.
-    conciliacion.anexos = dataToUpdate.anexos || [];
-    conciliacion.firma = dataToUpdate.firma;
+    // Only overwrite when explicitly sent, so partial saves no las borran.
+    if ('anexos' in dataToUpdate) {
+      conciliacion.anexos = dataToUpdate.anexos || [];
+    }
+    if ('firma' in dataToUpdate) {
+      conciliacion.firma = dataToUpdate.firma;
+    }
     
     console.log("[conciliacionController] updateConciliacion - object to be saved:", JSON.stringify(conciliacion.toObject(), null, 2));
     const updatedConciliacion = await conciliacion.save();
@@ -154,4 +172,117 @@ const updateConciliacion = async (req, res) => {
   }
 };
 
-module.exports = { createConciliacion, getConciliacionDocumento, getConciliacionById, updateConciliacion };
+// GET /api/conciliaciones — lista de conciliaciones del usuario autenticado
+const getMisConciliaciones = async (req, res) => {
+  try {
+    const query = { user: req.user._id };
+    if (req.query.estado) {
+      query.estado = req.query.estado;
+    }
+    const conciliaciones = await Conciliacion.find(query).sort({ updatedAt: -1 });
+    res.json(conciliaciones);
+  } catch (error) {
+    console.error('Error al obtener las conciliaciones del usuario:', error);
+    res.status(500).json({ message: 'Error del servidor' });
+  }
+};
+
+// POST /api/conciliaciones/borrador — crea o reutiliza el borrador activo del usuario
+const saveBorrador = async (req, res) => {
+  console.log("[conciliacionController] saveBorrador - body:", JSON.stringify(req.body, null, 2));
+  try {
+    const data = { ...req.body };
+
+    let borrador = await Conciliacion.findOne({
+      user: req.user._id,
+      estado: 'borrador',
+    }).sort({ updatedAt: -1 });
+
+    if (!borrador) {
+      borrador = new Conciliacion({
+        user: req.user._id,
+        estado: 'borrador',
+        tipoSolicitud: 'Solicitud de Conciliación Unificada',
+      });
+    }
+
+    delete data.user;
+    delete data._id;
+    delete data.estado;
+
+    borrador.set(data);
+
+    if ('anexos' in data) borrador.anexos = data.anexos || [];
+    if ('firma' in data) borrador.firma = data.firma;
+    if ('seccionesGuardadas' in data) borrador.seccionesGuardadas = data.seccionesGuardadas;
+
+    const saved = await borrador.save();
+    res.json(saved);
+  } catch (error) {
+    console.error('Error al guardar el borrador:', error);
+    res.status(400).json({
+      message: 'Error al guardar el borrador.',
+      error: error.errors ? Object.values(error.errors).map(e => e.message) : error.message,
+    });
+  }
+};
+
+// PUT /api/conciliaciones/borrador/:id
+const updateBorrador = async (req, res) => {
+  console.log(`[conciliacionController] updateBorrador ${req.params.id} - body:`, JSON.stringify(req.body, null, 2));
+  try {
+    const borrador = await Conciliacion.findById(req.params.id);
+
+    if (!borrador) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
+    const isOwner = borrador.user && borrador.user.toString() === req.user._id.toString();
+    if (!isOwner && !req.user.isAdmin) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
+    if (borrador.estado !== 'borrador') {
+      return res.status(400).json({ message: 'La solicitud ya fue completada y no puede guardarse como borrador.' });
+    }
+
+    const data = { ...req.body };
+    delete data.user;
+    delete data._id;
+    delete data.estado;
+
+    borrador.set(data);
+
+    if ('anexos' in data) borrador.anexos = data.anexos || [];
+    if ('firma' in data) borrador.firma = data.firma;
+    if ('seccionesGuardadas' in data) borrador.seccionesGuardadas = data.seccionesGuardadas;
+
+    const saved = await borrador.save();
+    res.json(saved);
+  } catch (error) {
+    console.error('Error al actualizar el borrador:', error);
+    res.status(400).json({
+      message: 'Error al actualizar el borrador.',
+      error: error.errors ? Object.values(error.errors).map(e => e.message) : error.message,
+    });
+  }
+};
+
+// DELETE /api/conciliaciones/borrador/:id
+const deleteBorrador = async (req, res) => {
+  try {
+    const borrador = await Conciliacion.findById(req.params.id);
+    if (!borrador) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
+    const isOwner = borrador.user && borrador.user.toString() === req.user._id.toString();
+    if (!isOwner && !req.user.isAdmin) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
+    await borrador.deleteOne();
+    res.json({ message: 'Borrador eliminado', id: req.params.id });
+  } catch (error) {
+    console.error('Error al eliminar el borrador:', error);
+    res.status(500).json({ message: 'Error del servidor al eliminar el borrador.' });
+  }
+};
+
+module.exports = { createConciliacion, getConciliacionDocumento, getConciliacionById, updateConciliacion, getMisConciliaciones, saveBorrador, updateBorrador, deleteBorrador };

@@ -12,7 +12,6 @@ import {
   Button, 
   Stack,
   Container,
-  Paper,
   alpha,
   useTheme,
   Fade,
@@ -32,58 +31,18 @@ import {
 } from '@mui/icons-material';
 import InsolvenciaForm from '../components/forms/InsolvenciaForm';
 import ConciliacionUnificadaForm from '../components/forms/ConciliacionUnificadaForm';
-import { createSolicitud, downloadSolicitudDocument } from '../services/solicitudService';
-import { createConciliacion, downloadConciliacionDocument } from '../services/conciliacionService';
+import { createSolicitud, updateSolicitud, downloadSolicitudDocument } from '../services/solicitudService';
+import { createConciliacion, updateConciliacion, downloadConciliacionDocument } from '../services/conciliacionService';
 import { toast } from 'react-toastify';
 import { handleAxiosError, showSuccess } from '../utils/alert';
+import SharedGlassCard from '../components/common/GlassCard';
 
 // Glassmorphism Card Component
-const GlassCard = React.forwardRef(({ children, sx = {}, hover = true, ...props }, ref) => {
-  return (
-    <Paper
-      ref={ref}
-      elevation={0}
-      sx={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%)',
-        backdropFilter: 'blur(25px)',
-        WebkitBackdropFilter: 'blur(25px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        borderRadius: '20px',
-        boxShadow: `
-          0 8px 32px rgba(0, 0, 0, 0.1),
-          inset 0 1px 0 rgba(255, 255, 255, 0.2),
-          0 0 0 1px rgba(255, 255, 255, 0.05)
-        `,
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'relative',
-        overflow: 'hidden',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '1px',
-          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)',
-        },
-        ...(hover && {
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: `
-              0 12px 40px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.1)
-            `,
-          }
-        }),
-        ...sx
-      }}
-      {...props}
-    >
-      {children}
-    </Paper>
-  );
-});
+const GlassCard = React.forwardRef(({ children, ...props }, ref) => (
+  <SharedGlassCard ref={ref} {...props}>
+    {children}
+  </SharedGlassCard>
+));
 
 // Lista unificada de tipos de solicitud con metadata
 const tiposDeSolicitud = [
@@ -139,13 +98,23 @@ const NuevaSolicitudPage = () => {
       console.log("[NuevaSolicitudPage] Data received from form:", data);
 
       let createdSolicitud;
-      if (tipoSeleccionado === 'Solicitud de Conciliación Unificada') {
-        // The data object from the form is sent directly
-        createdSolicitud = await createConciliacion(data);
-      } else {
-        // Add the tipoSolicitud to the data object and send directly
+      const esConciliacion = tipoSeleccionado === 'Solicitud de Conciliación Unificada';
+
+      // Si el formulario trae _borradorId, fue un guardado parcial: actualizar el
+      // documento existente marcándolo como completa (no duplicar).
+      const borradorId = data._borradorId;
+      delete data._borradorId;
+
+      if (esConciliacion) {
         const dataToSend = { ...data, tipoSolicitud: tipoSeleccionado };
-        createdSolicitud = await createSolicitud(dataToSend);
+        createdSolicitud = borradorId
+          ? await updateConciliacion(borradorId, { ...dataToSend, estado: 'completa' })
+          : await createConciliacion(dataToSend);
+      } else {
+        const dataToSend = { ...data, tipoSolicitud: tipoSeleccionado };
+        createdSolicitud = borradorId
+          ? await updateSolicitud(borradorId, { ...dataToSend, estado: 'completa' })
+          : await createSolicitud(dataToSend);
       }
       
       showSuccess('¡Éxito! La solicitud ha sido guardada correctamente.');

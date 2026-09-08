@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { API_BASE_URL } from './userService';
 
-const API_URL = 'https://api.systemlex.com.co/api/admin';
+const API_URL = `${API_BASE_URL}/api/admin`;
 
 // Helper para obtener el token y la configuración JSON
 const getConfig = (isJson = true) => {

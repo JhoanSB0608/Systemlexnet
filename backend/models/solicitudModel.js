@@ -249,6 +249,10 @@ const solicitudSchema = new mongoose.Schema({
       'Solicitud de Insolvencia Económica de Persona Natural No Comerciante',
     ]
   },
+  // Estado del documento: 'borrador' (guardado parcial en progreso) o 'completa'
+  estado: { type: String, enum: ['borrador', 'completa'], default: 'completa' },
+  // Secciones del wizard que ya fueron completadas/guardadas (para retomar el borrador)
+  seccionesGuardadas: { type: mongoose.Schema.Types.Mixed },
   
   // --- CAMPOS PARA INSOLVENCIA ---
   deudor: deudorSchema,

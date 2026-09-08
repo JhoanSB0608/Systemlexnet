@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { createConciliacion, getConciliacionDocumento, getConciliacionById, updateConciliacion } = require('../controllers/conciliacionController.js');
+const { createConciliacion, getConciliacionDocumento, getConciliacionById, updateConciliacion, getMisConciliaciones, saveBorrador, updateBorrador, deleteBorrador } = require('../controllers/conciliacionController.js');
 const { protect } = require('../middleware/authMiddleware.js');
 
 // Multer config for file uploads
@@ -27,7 +27,17 @@ const uploadFields = upload.fields([
 ]);
 
 router.route('/')
-  .post(protect, uploadFields, createConciliacion);
+  .post(protect, uploadFields, createConciliacion)
+  .get(protect, getMisConciliaciones);
+
+// Rutas de borrador (guardado parcial). Se registran antes de /:id para que
+// "borrador" no sea interpretado como un ObjectId.
+router.route('/borrador')
+  .post(protect, saveBorrador);
+
+router.route('/borrador/:id')
+  .put(protect, updateBorrador)
+  .delete(protect, deleteBorrador);
 
 router.route('/:id')
     .get(protect, getConciliacionById)

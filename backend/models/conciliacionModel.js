@@ -74,6 +74,10 @@ const conciliacionSchema = new mongoose.Schema({
         required: true,
         default: 'Solicitud de Conciliación Unificada',
     },
+    // Estado del documento: 'borrador' (guardado parcial en progreso) o 'completa'
+    estado: { type: String, enum: ['borrador', 'completa'], default: 'completa' },
+    // Secciones del wizard que ya fueron completadas/guardadas (para retomar el borrador)
+    seccionesGuardadas: { type: mongoose.Schema.Types.Mixed },
     sede: sedeSchema,
     infoGeneral: infoGeneralConciliacionSchema,
     convocantes: [partyMemberSchema],

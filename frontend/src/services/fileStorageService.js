@@ -1,5 +1,5 @@
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_GCS_API_URL || process.env.REACT_APP_BACKEND_URL || 'https://gcs-signed-urls-20536909632.us-central1.run.app';
 console.log("fileStorageService API_URL:", API_URL);
 
 /**
@@ -10,7 +10,7 @@ console.log("fileStorageService API_URL:", API_URL);
  */
 export const uploadFile = async (file) => {
   if (!API_URL) {
-    throw new Error("REACT_APP_BACKEND_URL is not defined.");
+    throw new Error("REACT_APP_GCS_API_URL / REACT_APP_BACKEND_URL is not defined.");
   }
   console.log(`[uploadFile] Requesting signed URL for: ${file.name} (Type: ${file.type}) from ${API_URL}/api/gcs/upload-url`);
 
@@ -70,7 +70,7 @@ export const uploadFile = async (file) => {
  */
 export const downloadFile = async (filename) => {
   if (!API_URL) {
-    throw new Error("REACT_APP_BACKEND_URL is not defined.");
+    throw new Error("REACT_APP_GCS_API_URL / REACT_APP_BACKEND_URL is not defined.");
   }
   const requestUrl = `${API_URL}/api/gcs/download-url?filename=${encodeURIComponent(filename)}`;
   console.log(`[downloadFile] Requesting signed URL for filename: "${filename}" from URL: ${requestUrl}`);

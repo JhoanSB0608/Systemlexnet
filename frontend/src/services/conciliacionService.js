@@ -1,8 +1,9 @@
 // conciliacionService.js
 import axios from 'axios';
 import { saveAs } from 'file-saver';
+import { API_BASE_URL } from './userService';
 
-const API_URL = 'https://api.systemlex.com.co/api/conciliaciones';
+const API_URL = `${API_BASE_URL}/api/conciliaciones`;
 
 const getToken = () => {
   const userInfo = localStorage.getItem('userInfo');

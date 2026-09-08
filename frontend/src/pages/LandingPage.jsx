@@ -17,11 +17,11 @@ import {
   Collapse,
   Divider,
   Chip,
-  Paper,
   Zoom,
   Fade
 } from '@mui/material';
 import { Link } from 'react-router-dom';
+import SharedGlassCard from '../components/common/GlassCard';
 import {
   Business as BusinessIcon,
   Description as DescriptionIcon,
@@ -36,72 +36,11 @@ import {
   Verified as VerifiedIcon
 } from '@mui/icons-material';
 
-const GlassCard = React.forwardRef(({ children, hover = true, sx = {}, ...props }, ref) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  return (
-    <Paper
-      ref={ref}
-      elevation={0}
-      onMouseEnter={() => hover && setIsHovered(true)}
-      onMouseLeave={() => hover && setIsHovered(false)}
-      sx={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%)',
-        backdropFilter: 'blur(25px)',
-        WebkitBackdropFilter: 'blur(25px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        borderRadius: '20px',
-        boxShadow: `
-          0 8px 32px rgba(0, 0, 0, 0.1),
-          inset 0 1px 0 rgba(255, 255, 255, 0.2),
-          0 0 0 1px rgba(255, 255, 255, 0.05)
-        `,
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'relative',
-        overflow: 'hidden',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '1px',
-          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)',
-        },
-        ...(hover && {
-          '&:hover': {
-            transform: 'translateY(-4px)',
-            boxShadow: `
-              0 20px 40px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.1)
-            `,
-          }
-        }),
-        ...(isHovered && {
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: '-100%',
-            width: '100%',
-            height: '100%',
-            background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)',
-            animation: 'shimmer 2s ease-in-out infinite',
-            '@keyframes shimmer': {
-              '0%': { left: '-100%' },
-              '100%': { left: '100%' },
-            },
-          }
-        }),
-        ...sx
-      }}
-      {...props}
-    >
-      {children}
-    </Paper>
-  );
-});
+const GlassCard = React.forwardRef(({ children, shimmer = true, ...props }, ref) => (
+  <SharedGlassCard ref={ref} shimmer={shimmer} {...props}>
+    {children}
+  </SharedGlassCard>
+));
 
 // Interactive Feature Card with Expanded Details
 const FeatureCard = ({ icon: Icon, title, description, bullets = [], delay = 0, badge }) => {

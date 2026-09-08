@@ -38,7 +38,12 @@ const EditarInsolvenciaPage = () => {
 
   const handleSubmit = (data) => {
     console.log("[EditarInsolvenciaPage] Data received from form:", data);
-    update(data);
+    // Si se retomó un borrador, al confirmar el envío se marca como completa.
+    if (solicitud?.estado === 'borrador') {
+      update({ ...data, estado: 'completa' });
+    } else {
+      update(data);
+    }
   };
 
   if (isLoading) {

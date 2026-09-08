@@ -8,7 +8,10 @@ const {
   getSolicitudDocumento, 
   getMisSolicitudes,
   getSolicitudById,
-  updateSolicitud
+  updateSolicitud,
+  saveBorrador,
+  updateBorrador,
+  deleteBorrador
 } = require('../controllers/solicitudController.js');
 const { protect } = require('../middleware/authMiddleware.js');
 
@@ -35,6 +38,15 @@ const uploadFields = upload.fields([
 router.route('/')
   .post(protect, uploadFields, createSolicitud)
   .get(protect, getMisSolicitudes);
+
+// Rutas de borrador (guardado parcial). Se registran antes de /:id para que
+// "borrador" no sea interpretado como un ObjectId.
+router.route('/borrador')
+  .post(protect, saveBorrador);
+
+router.route('/borrador/:id')
+  .put(protect, updateBorrador)
+  .delete(protect, deleteBorrador);
 
 router.route('/:id')
   .get(protect, getSolicitudById)

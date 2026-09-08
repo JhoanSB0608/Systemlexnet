@@ -3,7 +3,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { 
-  TextField, Button, Typography, Box, Paper, Grid, Tabs, Tab, Checkbox, 
+  TextField, Button, Typography, Box, Grid, Tabs, Tab, Checkbox, 
   FormControlLabel, FormControl, InputLabel, Select, MenuItem, FormHelperText,
   alpha, useTheme, Stack, Avatar, IconButton, Chip, LinearProgress, Collapse,
   Alert, Badge, RadioGroup, Radio, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, CircularProgress
@@ -25,48 +25,20 @@ import {
   Error as ErrorIcon,
   Close as CloseIcon,
   TrendingUp as TrendingUpIcon,
-  Create as CreateIcon
+  Create as CreateIcon,
+  Restore as RestoreIcon,
+  CloudDone as CloudDoneIcon,
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
 import SignatureCanvas from 'react-signature-canvas';
 import LocationSelector from './LocationSelector';
 import { uploadFile } from '../../services/fileStorageService'; // Import uploadFile
+import { useDebounce } from '../../hooks/useDebounce';
+import { useBorradorAutosave } from '../../hooks/useBorradorAutosave';
+import borradorService, { TIPO_CONCILIACION } from '../../services/borradorService';
+import GlassCard from '../common/GlassCard';
 
 // --- Reusable Glassmorphism Components ---
-const GlassCard = ({ children, sx = {}, hover = true, ...props }) => (
-  <Paper
-    elevation={0}
-    sx={{
-      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      borderRadius: '16px',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      position: 'relative',
-      overflow: 'hidden',
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '1px',
-        background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)',
-      },
-      ...(hover && {
-        '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15)',
-        }
-      }),
-      ...sx
-    }}
-    {...props}
-  >
-    {children}
-  </Paper>
-);
 
 const GlassTextField = React.forwardRef(({ error, helperText, ...props }, ref) => {
   const theme = useTheme();
@@ -317,9 +289,39 @@ const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
   );
 };
 
-const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
+// Limpia el payload del auto-guardado: elimina objetos File para poder persistirlo en JSON.
+const sanitizeBorradorPayload = (data) => {
+  return JSON.parse(
+    JSON.stringify(data, (key, value) => {
+      if (key === 'file') return undefined;
+      if (typeof File !== 'undefined' && value instanceof File) return undefined;
+      return value;
+    })
+  );
+};
+
+// Prepara los datos de un documento (edición o retomar borrador) para el form de react-hook-form.
+const buildFormattedData = (initialData) => ({
+  ...initialData,
+  convocantes: initialData.convocantes?.map((p) => ({
+    ...p,
+    fechaNacimiento: formatDateForInput(p.fechaNacimiento),
+  })),
+  convocados: initialData.convocados?.map((p) => ({
+    ...p,
+    fechaNacimiento: formatDateForInput(p.fechaNacimiento),
+  })),
+  anexos: initialData.anexos?.map((a) => ({
+    ...a,
+    name: a.name,
+    url: a.url,
+    file: undefined,
+  })),
+});
+
+const ConciliacionUnificadaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const theme = useTheme();
-  const { register, control, handleSubmit, watch, setValue, trigger, formState: { errors }, reset, setError } = useForm({
+  const { register, control, handleSubmit, watch, setValue, getValues, trigger, formState: { errors }, reset, setError } = useForm({
     defaultValues: {
       sede: {},
       infoGeneral: { asuntoJuridicoDefinible: false, cuantiaIndeterminada: false, cuantiaDetallada: false },
@@ -355,6 +357,38 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
       firma: false,
   });
 
+  // ============ GUARDADO PARCIAL / AUTO-SAVE ============
+  const tipoSolicitud = TIPO_CONCILIACION;
+  const esEdicion = !!initialData;
+  const esBorrador = esEdicion && initialData.estado === 'borrador';
+  const autosaveEnabled = !esEdicion || esBorrador;
+  const restoredRef = useRef(false); // evita auto-guardar antes de restaurar/montar el form
+  const [isRestoringDraft, setIsRestoringDraft] = useState(false);
+  const [borradorUpdatedAt, setBorradorUpdatedAt] = useState(null);
+
+  const {
+    borradorId,
+    saveStatus,
+    lastSavedAt,
+    requestSave,
+    flushSave,
+    clearBorrador,
+  } = useBorradorAutosave({
+    tipoSolicitud,
+    enabled: autosaveEnabled,
+    borradorId: esBorrador ? initialData._id : null,
+  });
+
+  const buildAutosavePayload = (sectionDeltas) => {
+    const formData = getValues();
+    const cleaned = sanitizeBorradorPayload(formData);
+    const nuevasSecciones = sectionDeltas
+      ? { ...savedSections, ...sectionDeltas }
+      : savedSections;
+    return { ...cleaned, seccionesGuardadas: nuevasSecciones };
+  };
+  // ======================================================
+
   const sigCanvas = useRef({});
   const signatureContainerRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState({ width: 500, height: 200 });
@@ -368,25 +402,16 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
   const [currentAnexoIndex, setCurrentAnexoIndex] = useState(null);
 
   useEffect(() => {
-    console.log('[ConciliacionUnificadaForm] InitialData received:', initialData);
+    if (restoredRef.current) return;
+    let cancelled = false;
+    const finish = () => {
+      if (!cancelled) restoredRef.current = true;
+    };
+
+    // Modo edición (documento o borrador existente)
     if (initialData) {
-      const formattedData = {
-        ...initialData,
-        convocantes: initialData.convocantes?.map(p => ({
-          ...p,
-          fechaNacimiento: formatDateForInput(p.fechaNacimiento),
-        })),
-        convocados: initialData.convocados?.map(p => ({
-          ...p,
-          fechaNacimiento: formatDateForInput(p.fechaNacimiento),
-        })),
-        anexos: initialData.anexos?.map(a => ({
-          ...a,
-          name: a.name, // Use 'name' directly from the initialData
-          url: a.url,   // Use 'url' directly from the initialData
-          file: undefined, // Ensure no File object is present for existing anexos
-        })),
-      };
+      console.log('[ConciliacionUnificadaForm] InitialData received:', initialData);
+      const formattedData = buildFormattedData(initialData);
       console.log('[ConciliacionUnificadaForm] Formatted data for reset:', formattedData);
       reset(formattedData);
 
@@ -408,13 +433,52 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
         }
       }
 
-      // Mark all sections as saved since we are editing
-      setSavedSections({
+      // Retomar un borrador: solo las secciones previamente guardadas quedan habilitadas.
+      if (esBorrador && initialData.seccionesGuardadas) {
+        setSavedSections((prev) => ({ ...prev, ...initialData.seccionesGuardadas }));
+        setBorradorUpdatedAt(initialData.updatedAt || null);
+        setIsRestoringDraft(true);
+      } else {
+        setSavedSections({
           sede: true, infoGeneral: true, convocantes: true, convocados: true,
           hechos: true, pretensiones: true, anexos: true, firma: true,
-      });
+        });
+      }
+      finish();
+      return () => { cancelled = true; };
     }
-  }, [initialData, reset, setValue]);
+
+    // Modo creación: si hay un borrador en localStorage para este tipo, reanudarlo.
+    if (autosaveEnabled && borradorId) {
+      (async () => {
+        try {
+          console.log('[ConciliacionUnificadaForm] Reanudando borrador:', borradorId);
+          const draf = await borradorService.obtenerBorrador(borradorId, tipoSolicitud);
+          if (cancelled) return;
+          reset(buildFormattedData(draf));
+          if (draf.seccionesGuardadas) {
+            setSavedSections((prev) => ({ ...prev, ...draf.seccionesGuardadas }));
+          }
+          setBorradorUpdatedAt(draf.updatedAt || null);
+          setIsRestoringDraft(true);
+        } catch (error) {
+          console.error('[ConciliacionUnificadaForm] No se pudo reanudar el borrador:', error);
+          if (!cancelled) clearBorrador();
+        } finally {
+          finish();
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+
+    // Creación limpia sin borrador previo: rápido delay antes de habilitar auto-guardado.
+    const t = setTimeout(finish, 1200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData, autosaveEnabled, borradorId, reset, resetToken, tipoSolicitud, clearBorrador]);
 
   useLayoutEffect(() => {
     function handleResize() {
@@ -526,7 +590,13 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
 
     if (isValid) {
       setValidationError('');
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate save
+      if (autosaveEnabled) {
+        // Persistir la sección en el borrador (guardado parcial real)
+        requestSave(buildAutosavePayload({ [sectionName]: true }));
+        await flushSave();
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate save
+      }
       setSavedSections(prev => ({ ...prev, [sectionName]: true }));
       if (nextTabIndex !== undefined) {
         setTabValue(nextTabIndex);
@@ -544,6 +614,15 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
 
   const customOnSubmit = async (data) => { // Make it async
     setIsUploading(true); // Start uploading indicator
+
+    // Asegurar que todo el guardado parcial pendiente se haya persistido
+    if (autosaveEnabled) {
+      try {
+        await flushSave();
+      } catch (e) {
+        console.warn('[ConciliacionUnificadaForm] No se pudo vaciar la cola de auto-guardado:', e);
+      }
+    }
 
     const dataToSend = { 
       ...data,
@@ -577,10 +656,60 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
     // If signatureSource is 'upload' but no new file is selected, and initialData had a URL, keep it.
     // This implicitly handles the case where initialData.firma.url exists from a previous save.
 
+    // Si es un borrador en progreso, el submit final debe actualizarlo (marcándolo como completa)
+    if (autosaveEnabled && borradorId) {
+      dataToSend._borradorId = borradorId;
+      dataToSend.estado = 'completa';
+    }
+
     setIsUploading(false); // End uploading indicator
     console.log("[ConciliacionUnificadaForm] Final data being sent to parent onSubmit:", dataToSend);
-    onSubmit(dataToSend); // Pass the processed data object, not FormData
+    await onSubmit(dataToSend); // Pass the processed data object, not FormData
+
+    // Solicitud creada/actualizada: limpiar la referencia al borrador
+    if (autosaveEnabled) {
+      clearBorrador();
+    }
   }
+
+  useEffect(() => {
+    if (resetToken) {
+      reset();
+      setTabValue(0);
+      setValidationError('');
+      setSavedSections({
+        sede: false,
+        infoGeneral: false,
+        convocantes: false,
+        convocados: false,
+        hechos: false,
+        pretensiones: false,
+        anexos: false,
+        firma: false,
+      });
+      // Nueva solicitud limpia: olvidar el borrador previo
+      restoredRef.current = false;
+      setIsRestoringDraft(false);
+      setBorradorUpdatedAt(null);
+      if (autosaveEnabled) clearBorrador();
+    }
+  }, [resetToken, reset, autosaveEnabled, clearBorrador]);
+
+  // Auto-guardado progresivo (debounced): persiste los cambios del formulario
+  // en el borrador tras ~3s sin actividad.
+  const watchedAll = watch();
+  const debouncedWatchedAll = useDebounce(watchedAll, 3000);
+  useEffect(() => {
+    if (!autosaveEnabled) return;
+    if (!restoredRef.current) return;
+    if (isUploading) return;
+    try {
+      requestSave(buildAutosavePayload());
+    } catch (e) {
+      console.warn('[ConciliacionUnificadaForm] Error al encolar auto-guardado:', e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedWatchedAll]);
 
   const allSectionsSaved = Object.values(savedSections).every(Boolean);
   const completionPercentage = (Object.values(savedSections).filter(Boolean).length / Object.values(savedSections).length) * 100;
@@ -642,6 +771,56 @@ const ConciliacionUnificadaForm = ({ onSubmit, initialData, isUpdating }) => {
               alignSelf: 'flex-start'
             }}
           />
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', ml: { xs: 0, sm: 'auto' } }}>
+            {isRestoringDraft && (
+              <Chip
+                icon={<RestoreIcon />}
+                label={borradorUpdatedAt
+                  ? `Borrador del ${new Date(borradorUpdatedAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                  : 'Borrador en curso'}
+                sx={{
+                  background: alpha(theme.palette.info.main, 0.12),
+                  color: theme.palette.info.main,
+                  fontWeight: 700,
+                }}
+              />
+            )}
+            {autosaveEnabled && saveStatus === 'saving' && (
+              <Chip
+                icon={<CloudUploadIcon />}
+                label="Guardando..."
+                sx={{
+                  background: alpha(theme.palette.warning.main, 0.12),
+                  color: theme.palette.warning.main,
+                  fontWeight: 600,
+                }}
+              />
+            )}
+            {autosaveEnabled && saveStatus === 'saved' && (
+              <Chip
+                icon={<CloudDoneIcon />}
+                label={lastSavedAt
+                  ? `Guardado ${lastSavedAt.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
+                  : 'Guardado'}
+                sx={{
+                  background: alpha(theme.palette.success.main, 0.12),
+                  color: theme.palette.success.main,
+                  fontWeight: 600,
+                }}
+              />
+            )}
+            {autosaveEnabled && saveStatus === 'error' && (
+              <Chip
+                icon={<ErrorIcon />}
+                label="Error al guardar (se reintentará)"
+                sx={{
+                  background: alpha(theme.palette.error.main, 0.12),
+                  color: theme.palette.error.main,
+                  fontWeight: 600,
+                }}
+              />
+            )}
+          </Box>
           <Box>
             <LinearProgress
               variant="determinate"

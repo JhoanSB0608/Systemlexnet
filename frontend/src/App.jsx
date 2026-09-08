@@ -22,6 +22,7 @@ import ArchiverPage from './pages/ArchiverPage'; // New import
 import ArchivedRequestsListPage from './pages/ArchivedRequestsListPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { ThemeModeProvider, useThemeMode } from './theme/ThemeContext';
 
 export const AuthContext = createContext(null);
 
@@ -29,11 +30,13 @@ const queryClient = new QueryClient();
 
 // El AuthProvider debe estar dentro de un Router para usar useNavigate
 const AuthWrapper = ({ children }) => (
-  <Router>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
-    </QueryClientProvider>
-  </Router>
+  <ThemeModeProvider>
+    <Router>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>{children}</AuthProvider>
+      </QueryClientProvider>
+    </Router>
+  </ThemeModeProvider>
 );
 
 const AuthProvider = ({ children }) => {
@@ -41,6 +44,7 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [showIdleModal, setShowIdleModal] = useState(false);
   const navigate = useNavigate();
+  const { mode } = useThemeMode();
 
   useEffect(() => {
     const checkUserSession = async () => {
@@ -134,7 +138,7 @@ const AuthProvider = ({ children }) => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="colored"
+        theme={mode === 'dark' ? 'dark' : 'colored'}
       />
       <SessionTimeoutModal
         open={showIdleModal}
