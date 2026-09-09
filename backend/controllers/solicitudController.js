@@ -125,7 +125,6 @@ const buildDeudorNombreCompleto = (deudor) => {
 // Crea un borrador nuevo, o reutiliza el último borrador activo del mismo tipo (upsert).
 // Esto permite "pausar y retomar" la solicitud en progreso.
 const saveBorrador = async (req, res) => {
-  console.log("[solicitudController] saveBorrador - body:", JSON.stringify(req.body, null, 2));
   try {
     const data = { ...req.body };
     const { tipoSolicitud } = data;
@@ -159,7 +158,6 @@ const saveBorrador = async (req, res) => {
     const saved = await borrador.save();
     res.json(saved);
   } catch (error) {
-    console.error('Error al guardar el borrador:', error);
     res.status(400).json({
       message: 'Error al guardar el borrador.',
       error: error.errors ? Object.values(error.errors).map(e => e.message) : error.message,

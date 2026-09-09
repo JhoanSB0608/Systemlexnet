@@ -1,5 +1,6 @@
 const Conciliacion = require('../models/conciliacionModel');
 const Solicitud = require('../models/solicitudModel');
+const Poder = require('../models/poderModel');
 const User = require('../models/userModel');
 const Acreedor = require('../models/acreedorModel');
 
@@ -136,6 +137,59 @@ const getSolicitudes = async (req, res) => {
   }
 };
 
+// @desc    Obtener historial de poderes con paginación
+// @route   GET /api/admin/poderes
+// @access  Private/Admin
+const getPoderes = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, filters = '[]', sorting = '[]' } = req.query;
+
+    const parsedFilters = JSON.parse(filters);
+    const query = {};
+    if (parsedFilters.length > 0) {
+      query.$and = parsedFilters.map(filter => {
+        if (filter.id === 'user.name') {
+          return { 'user.name': { $regex: filter.value, $options: 'i' } };
+        }
+        return { [filter.id]: { $regex: filter.value, $options: 'i' } };
+      });
+    }
+
+    const parsedSorting = JSON.parse(sorting);
+    const sortOptions = parsedSorting.length > 0
+      ? parsedSorting.reduce((acc, sort) => {
+          acc[sort.id] = sort.desc ? -1 : 1;
+          return acc;
+        }, {})
+      : { createdAt: -1 };
+
+    const [poderes, count] = await Promise.all([
+      Poder.find(query)
+        .populate('user', 'name email')
+        .select('-firma')
+        .sort(sortOptions)
+        .lean(),
+      Poder.countDocuments(query),
+    ]);
+
+    const totalRows = count;
+    const pageIndex = parseInt(page) - 1;
+    const pageSize = parseInt(limit);
+    const pagedResults = poderes.slice(
+      pageIndex * pageSize,
+      (pageIndex + 1) * pageSize
+    );
+
+    res.json({
+      rows: pagedResults,
+      pageCount: Math.ceil(totalRows / pageSize),
+      totalRows,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener poderes', error: error.message });
+  }
+};
+
 const uploadAnexo = async (req, res) => {
   try {
     const { tipo, id } = req.params;
@@ -178,4 +232,4 @@ const uploadAnexo = async (req, res) => {
 };
 
 
-module.exports = { getStats, getSolicitudes, uploadAnexo };
+module.exports = { getStats, getSolicitudes, getPoderes, uploadAnexo };

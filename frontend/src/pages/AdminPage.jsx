@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { getAdminStats, getAdminSolicitudes, uploadAnexo } from '../services/adminService';
+import { getAdminStats, getAdminSolicitudes, getAdminPoderes, uploadAnexo } from '../services/adminService';
 import { downloadSolicitudDocument } from '../services/solicitudService';
 import { downloadConciliacionDocument } from '../services/conciliacionService';
+import { downloadPoderDocument } from '../services/poderService';
 import { downloadFile, uploadFile as fileStorageServiceUploadFile } from '../services/fileStorageService';
 import { toast } from 'react-toastify';
 import { handleAxiosError } from '../utils/alert';
@@ -1493,6 +1494,104 @@ function TabPanel(props) {
   );
 }
 
+const PoderesTable = ({ rows, totalRows, isLoading, page, rowsPerPage, onPageChange, onRowsPerPageChange, onDownloadPoder }) => {
+  const theme = useTheme();
+  const headCells = ['Fecha', 'Usuario', 'Poderdante', 'Apoderado', 'Entidad', 'Acciones'];
+
+  return (
+    <GlassCard>
+      <TableContainer sx={{ borderRadius: 3 }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              {headCells.map((label) => (
+                <TableCell
+                  key={label}
+                  sx={{
+                    py: 2,
+                    bgcolor: alpha(theme.palette.primary.main, 0.02),
+                    borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
+                    {label}
+                  </Typography>
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={headCells.length} align="center" sx={{ py: 8 }}>
+                  <Stack alignItems="center" spacing={2}>
+                    <CircularProgress size={40} thickness={4} />
+                    <Typography variant="body2" color="text.secondary">
+                      Cargando poderes...
+                    </Typography>
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={headCells.length} align="center" sx={{ py: 8 }}>
+                  <Stack alignItems="center" spacing={2}>
+                    <AssignmentIcon sx={{ fontSize: 48, color: theme.palette.text.disabled }} />
+                    <Typography variant="h6" color="text.secondary">
+                      No se encontraron poderes
+                    </Typography>
+                    <Typography variant="body2" color="text.disabled">
+                      Aún no hay poderes generados
+                    </Typography>
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((poder) => (
+                <TableRow key={poder._id} hover sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}>
+                  <TableCell sx={{ py: 2 }}>{new Date(poder.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell sx={{ py: 2 }}>{poder.user?.name || 'N/A'}</TableCell>
+                  <TableCell sx={{ py: 2 }}>{poder.poderdante?.nombre || '—'}</TableCell>
+                  <TableCell sx={{ py: 2 }}>{poder.apoderado?.nombre || '—'}</TableCell>
+                  <TableCell sx={{ py: 2 }}>{poder.destinatario?.entidad || '—'}</TableCell>
+                  <TableCell sx={{ py: 2 }}>
+                    <Tooltip title="Descargar PDF">
+                      <IconButton onClick={() => onDownloadPoder(poder._id)}><PictureAsPdf /></IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <Divider />
+      <TablePagination
+        component="div"
+        count={totalRows ?? 0}
+        page={page}
+        onPageChange={onPageChange}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={onRowsPerPageChange}
+        rowsPerPageOptions={[5, 10, 20, 50]}
+        labelRowsPerPage="Filas por página:"
+        labelDisplayedRows={({ from, to, count }) =>
+          `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+        }
+        sx={{
+          borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+          '& .MuiTablePagination-actions': {
+            '& button': {
+              borderRadius: 2,
+              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+            }
+          }
+        }}
+      />
+    </GlassCard>
+  );
+};
+
 const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
   const [description, setDescription] = useState(defaultValue);
 
@@ -1551,6 +1650,12 @@ const AdminPage = () => {
   const debouncedLocalFilters = useDebounce(localFilters, 500);
   const [expanded, setExpanded] = useState({});
 
+  const [historialView, setHistorialView] = useState('solicitudes'); // 'solicitudes' | 'poderes'
+  const [poderFilters, setPoderFilters] = useState([]);
+  const [poderPagination, setPoderPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [localPoderFilters, setLocalPoderFilters] = useState({ user: '', poderdante: '', apoderado: '', entidad: '' });
+  const debouncedPoderFilters = useDebounce(localPoderFilters, 500);
+
   const [modalState, setModalState] = useState({
       open: false,
       type: null, // 'deudor', 'acreedores', 'convocantes', 'convocados'
@@ -1581,6 +1686,22 @@ const AdminPage = () => {
     }
   };
 
+  const handleDownloadPoder = async (poderId) => {
+    const toastId = toast.loading('Descargando documento del Poder, por favor espere...');
+    try {
+      await downloadPoderDocument(poderId);
+      toast.update(toastId, { 
+        render: "¡Descarga Completada!", 
+        type: "success", 
+        isLoading: false, 
+        autoClose: 5000 
+      });
+    } catch (error) {
+      toast.dismiss(toastId);
+      handleAxiosError(error, 'Error al descargar el documento del Poder.');
+    }
+  };
+
   useEffect(() => {
     const filters = Object.entries(debouncedLocalFilters)
       .filter(([, value]) => value !== '')
@@ -1588,6 +1709,20 @@ const AdminPage = () => {
     setColumnFilters(filters);
     setPagination(prev => ({ ...prev, pageIndex: 0 }));
   }, [debouncedLocalFilters]);
+
+  useEffect(() => {
+    const pathMap = {
+      poderdante: 'poderdante.nombre',
+      apoderado: 'apoderado.nombre',
+      entidad: 'destinatario.entidad',
+      user: 'user.name',
+    };
+    const filters = Object.entries(debouncedPoderFilters)
+      .filter(([, value]) => value !== '')
+      .map(([id, value]) => ({ id: pathMap[id] || id, value }));
+    setPoderFilters(filters);
+    setPoderPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }, [debouncedPoderFilters]);
 
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useQuery({ 
     queryKey: ['adminStats', refreshKey], 
@@ -1617,6 +1752,32 @@ const AdminPage = () => {
       return data;
     },
     enabled: tabIndex === 1,
+    keepPreviousData: true,
+    staleTime: 10000,
+  });
+
+  const poderQueryKey = useMemo(() => 
+    ['adminPoderes', poderPagination, poderFilters, refreshKey], 
+    [poderPagination, poderFilters, refreshKey]
+  );
+
+  const { 
+    data: poderesData, 
+    isLoading: isLoadingPoderes, 
+    isError: isErrorPoderes,
+    refetch: refetchPoderes,
+  } = useQuery({ 
+    queryKey: poderQueryKey, 
+    queryFn: async () => {
+      const data = await getAdminPoderes({ 
+        pageIndex: poderPagination.pageIndex, 
+        pageSize: poderPagination.pageSize, 
+        filters: JSON.stringify(poderFilters), 
+        sorting: '[]' 
+      });
+      return data;
+    },
+    enabled: tabIndex === 1 && historialView === 'poderes',
     keepPreviousData: true,
     staleTime: 10000,
   });
@@ -1820,13 +1981,20 @@ const AdminPage = () => {
     const { name, value } = e.target;
     setLocalFilters(prev => ({...prev, [name]: value}));
   };
+  const handlePoderFilterChange = (e) => {
+    const { name, value } = e.target;
+    setLocalPoderFilters(prev => ({...prev, [name]: value}));
+  };
 
   const handleRefresh = () => {
     if (tabIndex === 0) {
       refetchStats();
     }
-    if (tabIndex === 1) {
+    if (tabIndex === 1 && historialView === 'solicitudes') {
       refetchSolicitudes();
+    }
+    if (tabIndex === 1 && historialView === 'poderes') {
+      refetchPoderes();
     }
   };
 
@@ -2001,6 +2169,63 @@ const AdminPage = () => {
 
           <TabPanel value={tabIndex} index={1}>
             <Stack spacing={3}>
+              {/* Sub-navigation: Solicitudes vs Poderes */}
+              <GlassCard hover={false}>
+                <Tabs 
+                  value={historialView} 
+                  onChange={(e, newValue) => setHistorialView(newValue)} 
+                  variant="fullWidth"
+                  sx={{ 
+                    px: 2,
+                    '& .MuiTab-root': {
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      minHeight: 56,
+                      borderRadius: 3,
+                      margin: '8px 4px',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                        transform: 'translateY(-2px)',
+                      },
+                      '&.Mui-selected': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.12),
+                        color: theme.palette.primary.main,
+                      }
+                    },
+                    '& .MuiTabs-indicator': {
+                      height: 3,
+                      borderRadius: 3,
+                      background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                    }
+                  }}
+                >
+                  <Tab 
+                    value="solicitudes" 
+                    icon={<AssignmentIcon />} 
+                    iconPosition="start" 
+                    label="Solicitudes" 
+                  />
+                  <Tab 
+                    value="poderes" 
+                    icon={
+                      <Badge 
+                        badgeContent={poderesData?.totalRows || 0} 
+                        color="secondary"
+                        max={999}
+                      >
+                        <Gavel />
+                      </Badge>
+                    } 
+                    iconPosition="start" 
+                    label="Poderes" 
+                  />
+                </Tabs>
+              </GlassCard>
+
+              {historialView === 'solicitudes' ? (
+                <>
               {/* Enhanced Filters */}
               <GlassCard>
                 <CardContent sx={{ p: 3 }}>
@@ -2091,6 +2316,146 @@ const AdminPage = () => {
                 >
                   Error al cargar las solicitudes. Verifica tu conexión e intenta nuevamente.
                 </Alert>
+              )}
+                </>
+              ) : (
+                <>
+                  {/* Poderes Filters */}
+                  <GlassCard>
+                    <CardContent sx={{ p: 3 }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+                        <Stack direction="row" alignItems="center" spacing={2}>
+                          <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.1), color: theme.palette.info.main }}>
+                            <FilterList />
+                          </Avatar>
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            Filtros de Poderes
+                          </Typography>
+                        </Stack>
+                        <Chip 
+                          label={`${poderesData?.totalRows || 0} registros`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                      </Stack>
+
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                          <TextField 
+                            name="poderdante" 
+                            label="Buscar por Poderdante" 
+                            value={localPoderFilters.poderdante} 
+                            onChange={handlePoderFilterChange} 
+                            variant="outlined" 
+                            fullWidth
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search color="action" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 3,
+                              }
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <TextField 
+                            name="apoderado" 
+                            label="Buscar por Apoderado" 
+                            value={localPoderFilters.apoderado} 
+                            onChange={handlePoderFilterChange} 
+                            variant="outlined" 
+                            fullWidth
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search color="action" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 3,
+                              }
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <TextField 
+                            name="entidad" 
+                            label="Buscar por Entidad" 
+                            value={localPoderFilters.entidad} 
+                            onChange={handlePoderFilterChange} 
+                            variant="outlined" 
+                            fullWidth
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search color="action" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 3,
+                              }
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <TextField 
+                            name="user" 
+                            label="Buscar por Usuario" 
+                            value={localPoderFilters.user} 
+                            onChange={handlePoderFilterChange} 
+                            variant="outlined" 
+                            fullWidth
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search color="action" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 3,
+                              }
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </GlassCard>
+
+                  <PoderesTable 
+                    rows={poderesData?.rows ?? []}
+                    totalRows={poderesData?.totalRows ?? 0}
+                    isLoading={isLoadingPoderes}
+                    page={poderPagination.pageIndex}
+                    rowsPerPage={poderPagination.pageSize}
+                    onPageChange={(e, newPage) => setPoderPagination(prev => ({ ...prev, pageIndex: newPage }))}
+                    onRowsPerPageChange={(e) => setPoderPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value, 10), pageIndex: 0 }))}
+                    onDownloadPoder={handleDownloadPoder}
+                  />
+
+                  {isErrorPoderes && (
+                    <Alert 
+                      severity="error"
+                      sx={{ 
+                        borderRadius: 3,
+                        bgcolor: alpha(theme.palette.error.main, 0.1),
+                        border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`
+                      }}
+                    >
+                      Error al cargar los poderes. Verifica tu conexión e intenta nuevamente.
+                    </Alert>
+                  )}
+                </>
               )}
             </Stack>
           </TabPanel>

@@ -37,6 +37,18 @@ export const getAdminSolicitudes = async ({ pageIndex, pageSize, filters, sortin
   return data;
 };
 
+// Obtener el historial de poderes (con paginación, filtros y ordenamiento)
+export const getAdminPoderes = async ({ pageIndex, pageSize, filters, sorting }) => {
+  const params = new URLSearchParams({
+    page: pageIndex + 1,
+    limit: pageSize,
+    filters: filters || '[]',
+    sorting: sorting || '[]',
+  });
+  const { data } = await axios.get(`${API_URL}/poderes?${params.toString()}`, getConfig());
+  return data;
+};
+
 // Subir un anexo a una solicitud existente
 export const uploadAnexo = async (id, tipo, filename, fileUrl, descripcion = '', size) => {
   const payload = { filename, fileUrl, descripcion, size };

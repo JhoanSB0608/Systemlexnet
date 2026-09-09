@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { getStats, getSolicitudes, uploadAnexo } = require('../controllers/adminController.js');
+const { getStats, getSolicitudes, getPoderes, uploadAnexo } = require('../controllers/adminController.js');
 const { protect, admin } = require('../middleware/authMiddleware.js');
 
 // Multer config for file uploads
@@ -25,6 +25,7 @@ const upload = multer({ storage: storage }).single('anexo');
 // Todas las rutas de admin requieren autenticación y rol de administrador
 router.get('/stats', protect, admin, getStats);
 router.get('/solicitudes', protect, admin, getSolicitudes);
+router.get('/poderes', protect, admin, getPoderes);
 
 // Route for uploading an anexo
 router.post('/upload-anexo/:tipo/:id', protect, admin, upload, uploadAnexo);

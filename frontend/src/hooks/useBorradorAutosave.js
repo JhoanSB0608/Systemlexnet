@@ -97,7 +97,6 @@ export const useBorradorAutosave = ({
         // Re-encolar el dato pendiente para reintentar en el siguiente guardado
         pendingDataRef.current = data;
         if (onError) onError(error);
-        console.error('[useBorradorAutosave] Error al guardar el borrador:', error);
       } finally {
         savingRef.current = false;
       }
