@@ -49,6 +49,18 @@ export const getAdminPoderes = async ({ pageIndex, pageSize, filters, sorting })
   return data;
 };
 
+// Obtener el historial de contratos (con paginación, filtros y ordenamiento)
+export const getAdminContratos = async ({ pageIndex, pageSize, filters, sorting }) => {
+  const params = new URLSearchParams({
+    page: pageIndex + 1,
+    limit: pageSize,
+    filters: filters || '[]',
+    sorting: sorting || '[]',
+  });
+  const { data } = await axios.get(`${API_URL}/contratos?${params.toString()}`, getConfig());
+  return data;
+};
+
 // Subir un anexo a una solicitud existente
 export const uploadAnexo = async (id, tipo, filename, fileUrl, descripcion = '', size) => {
   const payload = { filename, fileUrl, descripcion, size };

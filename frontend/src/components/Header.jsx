@@ -11,6 +11,7 @@ const navegacion = [
   { to: '/nueva-solicitud', label: 'Nueva Solicitud', color: '#16a34a', icon: '➕' },
   { to: '/archiver', label: 'Archivador', color: '#d97706', icon: '🗄️' },
   { to: '/poder', label: 'Poder', color: '#0d9488', icon: '📝' },
+  { to: '/contrato', label: 'Contrato', color: '#4f46e5', icon: '📄' },
   { to: '/admin', label: 'Admin', color: '#7c3aed', icon: '⚙️', soloAdmin: true },
 ];
 

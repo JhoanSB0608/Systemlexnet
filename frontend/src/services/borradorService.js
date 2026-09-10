@@ -7,10 +7,12 @@ import { API_BASE_URL } from './userService'; // Assuming this is defined in use
 const INSOLVENCIA_API_URL = `${API_BASE_URL}/api/solicitudes`;
 const CONCILIACION_API_URL = `${API_BASE_URL}/api/conciliaciones`;
 const PODER_API_URL = `${API_BASE_URL}/api/poder`;
+const CONTRATO_API_URL = `${API_BASE_URL}/api/contrato`;
 
 export const TIPO_INSOLVENCIA = 'Solicitud de Insolvencia Económica de Persona Natural No Comerciante';
 export const TIPO_CONCILIACION = 'Solicitud de Conciliación Unificada';
 export const TIPO_PODER = 'Poder';
+export const TIPO_CONTRATO = 'Contrato de Prestación de Servicios';
 
 const getToken = () => {
   const userInfo = localStorage.getItem('userInfo');
@@ -27,6 +29,7 @@ const getConfig = (options = {}) => {
 export const obtenerApiBaseDeTipo = (tipoSolicitud) => {
   if (tipoSolicitud === TIPO_CONCILIACION) return CONCILIACION_API_URL;
   if (tipoSolicitud === TIPO_PODER) return PODER_API_URL;
+  if (tipoSolicitud === TIPO_CONTRATO) return CONTRATO_API_URL;
   return INSOLVENCIA_API_URL;
 };
 
@@ -53,6 +56,7 @@ export const actualizarBorrador = async (borradorId, payload) => {
       `${INSOLVENCIA_API_URL}/borrador/${borradorId}`,
       `${CONCILIACION_API_URL}/borrador/${borradorId}`,
       `${PODER_API_URL}/borrador/${borradorId}`,
+      `${CONTRATO_API_URL}/borrador/${borradorId}`,
     ];
     let lastError = null;
     for (const url of endpoints) {

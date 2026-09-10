@@ -22,6 +22,8 @@ import ArchiverPage from './pages/ArchiverPage'; // New import
 import ArchivedRequestsListPage from './pages/ArchivedRequestsListPage';
 import PoderPage from './pages/PoderPage';
 import EditarPoderPage from './pages/EditarPoderPage';
+import ContratoPage from './pages/ContratoPage';
+import EditarContratoPage from './pages/EditarContratoPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ThemeModeProvider, useThemeMode } from './theme/ThemeContext';
@@ -164,9 +166,11 @@ const AuthProvider = ({ children }) => {
           <Route path="/admin/editar-solicitud/:id" element={<PrivateRoute><EditarInsolvenciaPage /></PrivateRoute>} />
           <Route path="/admin/editar-conciliacion/:id" element={<PrivateRoute><EditarConciliacionPage /></PrivateRoute>} />
           <Route path="/admin/editar-poder/:id" element={<PrivateRoute><EditarPoderPage /></PrivateRoute>} />
+          <Route path="/admin/editar-contrato/:id" element={<PrivateRoute><EditarContratoPage /></PrivateRoute>} />
           <Route path="/archiver-create" element={<PrivateRoute><ArchiverPage /></PrivateRoute>} />
           <Route path="/archiver" element={<PrivateRoute><ArchivedRequestsListPage /></PrivateRoute>} />
           <Route path="/poder" element={<PrivateRoute><PoderPage /></PrivateRoute>} />
+          <Route path="/contrato" element={<PrivateRoute><ContratoPage /></PrivateRoute>} />
         </Routes>
       </Container>
     </AuthContext.Provider>

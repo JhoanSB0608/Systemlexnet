@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { getAdminStats, getAdminSolicitudes, getAdminPoderes, uploadAnexo } from '../services/adminService';
+import { getAdminStats, getAdminSolicitudes, getAdminPoderes, getAdminContratos, uploadAnexo } from '../services/adminService';
 import { downloadSolicitudDocument } from '../services/solicitudService';
 import { downloadConciliacionDocument } from '../services/conciliacionService';
 import { downloadPoderDocument } from '../services/poderService';
+import { downloadContratoDocument } from '../services/contratoService';
 import { downloadFile, uploadFile as fileStorageServiceUploadFile } from '../services/fileStorageService';
 import { toast } from 'react-toastify';
 import { handleAxiosError } from '../utils/alert';
@@ -1595,6 +1596,119 @@ const PoderesTable = ({ rows, totalRows, isLoading, page, rowsPerPage, onPageCha
   );
 };
 
+const ContratosTable = ({ rows, totalRows, isLoading, page, rowsPerPage, onPageChange, onRowsPerPageChange, onDownloadContrato, onEditContrato }) => {
+  const theme = useTheme();
+  const headCells = ['Fecha', 'Usuario', 'Comitente', 'Abogado', 'Honores', 'Estado', 'Acciones'];
+
+  return (
+    <GlassCard>
+      <TableContainer sx={{ borderRadius: 3 }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              {headCells.map((label) => (
+                <TableCell
+                  key={label}
+                  sx={{
+                    py: 2,
+                    bgcolor: alpha(theme.palette.primary.main, 0.02),
+                    borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
+                    {label}
+                  </Typography>
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={headCells.length} align="center" sx={{ py: 8 }}>
+                  <Stack alignItems="center" spacing={2}>
+                    <CircularProgress size={40} thickness={4} />
+                    <Typography variant="body2" color="text.secondary">
+                      Cargando contratos...
+                    </Typography>
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={headCells.length} align="center" sx={{ py: 8 }}>
+                  <Stack alignItems="center" spacing={2}>
+                    <AssignmentIcon sx={{ fontSize: 48, color: theme.palette.text.disabled }} />
+                    <Typography variant="h6" color="text.secondary">
+                      No se encontraron contratos
+                    </Typography>
+                    <Typography variant="body2" color="text.disabled">
+                      Aún no hay contratos generados
+                    </Typography>
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((contrato) => {
+                const isDraft = contrato.estado === 'borrador';
+                return (
+                  <TableRow key={contrato._id} hover sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}>
+                    <TableCell sx={{ py: 2 }}>{new Date(contrato.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell sx={{ py: 2 }}>{contrato.user?.name || 'N/A'}</TableCell>
+                    <TableCell sx={{ py: 2 }}>{contrato.comitente?.nombre || '—'}</TableCell>
+                    <TableCell sx={{ py: 2 }}>{contrato.abogado?.nombre || '—'}</TableCell>
+                    <TableCell sx={{ py: 2 }}>{contrato.siniestro?.porcentaje != null ? `${contrato.siniestro.porcentaje}%` : '—'}</TableCell>
+                    <TableCell sx={{ py: 2 }}>
+                      <Chip
+                        label={isDraft ? 'Borrador' : 'Completado'}
+                        size="small"
+                        color={isDraft ? 'warning' : 'success'}
+                        variant={isDraft ? 'outlined' : 'filled'}
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 2 }}>
+                      <Tooltip title="Editar Contrato">
+                        <IconButton onClick={() => onEditContrato(contrato._id)}><EditIcon /></IconButton>
+                      </Tooltip>
+                      <Tooltip title="Descargar PDF">
+                        <IconButton onClick={() => onDownloadContrato(contrato._id)}><PictureAsPdf /></IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <Divider />
+      <TablePagination
+        component="div"
+        count={totalRows ?? 0}
+        page={page}
+        onPageChange={onPageChange}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={onRowsPerPageChange}
+        rowsPerPageOptions={[5, 10, 20, 50]}
+        labelRowsPerPage="Filas por página:"
+        labelDisplayedRows={({ from, to, count }) =>
+          `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+        }
+        sx={{
+          borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+          '& .MuiTablePagination-actions': {
+            '& button': {
+              borderRadius: 2,
+              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+            }
+          }
+        }}
+      />
+    </GlassCard>
+  );
+};
+
 const DescriptionModal = ({ open, onClose, onConfirm, defaultValue = '' }) => {
   const [description, setDescription] = useState(defaultValue);
 
@@ -1653,11 +1767,16 @@ const AdminPage = () => {
   const debouncedLocalFilters = useDebounce(localFilters, 500);
   const [expanded, setExpanded] = useState({});
 
-  const [historialView, setHistorialView] = useState('solicitudes'); // 'solicitudes' | 'poderes'
+  const [historialView, setHistorialView] = useState('solicitudes'); // 'solicitudes' | 'poderes' | 'contratos'
   const [poderFilters, setPoderFilters] = useState([]);
   const [poderPagination, setPoderPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [localPoderFilters, setLocalPoderFilters] = useState({ user: '', poderdante: '', apoderado: '', entidad: '' });
   const debouncedPoderFilters = useDebounce(localPoderFilters, 500);
+
+  const [contratoFilters, setContratoFilters] = useState([]);
+  const [contratoPagination, setContratoPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [localContratoFilters, setLocalContratoFilters] = useState({ user: '', comitente: '', abogado: '' });
+  const debouncedContratoFilters = useDebounce(localContratoFilters, 500);
 
   const [modalState, setModalState] = useState({
       open: false,
@@ -1705,6 +1824,22 @@ const AdminPage = () => {
     }
   };
 
+  const handleDownloadContrato = async (contratoId) => {
+    const toastId = toast.loading('Descargando documento del Contrato, por favor espere...');
+    try {
+      await downloadContratoDocument(contratoId);
+      toast.update(toastId, { 
+        render: "¡Descarga Completada!", 
+        type: "success", 
+        isLoading: false, 
+        autoClose: 5000 
+      });
+    } catch (error) {
+      toast.dismiss(toastId);
+      handleAxiosError(error, 'Error al descargar el documento del Contrato.');
+    }
+  };
+
   useEffect(() => {
     const filters = Object.entries(debouncedLocalFilters)
       .filter(([, value]) => value !== '')
@@ -1726,6 +1861,19 @@ const AdminPage = () => {
     setPoderFilters(filters);
     setPoderPagination(prev => ({ ...prev, pageIndex: 0 }));
   }, [debouncedPoderFilters]);
+
+  useEffect(() => {
+    const pathMapContrato = {
+      comitente: 'comitente.nombre',
+      abogado: 'abogado.nombre',
+      user: 'user.name',
+    };
+    const filters = Object.entries(debouncedContratoFilters)
+      .filter(([, value]) => value !== '')
+      .map(([id, value]) => ({ id: pathMapContrato[id] || id, value }));
+    setContratoFilters(filters);
+    setContratoPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }, [debouncedContratoFilters]);
 
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useQuery({ 
     queryKey: ['adminStats', refreshKey], 
@@ -1781,6 +1929,32 @@ const AdminPage = () => {
       return data;
     },
     enabled: tabIndex === 1 && historialView === 'poderes',
+    keepPreviousData: true,
+    staleTime: 10000,
+  });
+
+  const contratoQueryKey = useMemo(() => 
+    ['adminContratos', contratoPagination, contratoFilters, refreshKey], 
+    [contratoPagination, contratoFilters, refreshKey]
+  );
+
+  const { 
+    data: contratosData, 
+    isLoading: isLoadingContratos, 
+    isError: isErrorContratos,
+    refetch: refetchContratos,
+  } = useQuery({ 
+    queryKey: contratoQueryKey, 
+    queryFn: async () => {
+      const data = await getAdminContratos({ 
+        pageIndex: contratoPagination.pageIndex, 
+        pageSize: contratoPagination.pageSize, 
+        filters: JSON.stringify(contratoFilters), 
+        sorting: '[]' 
+      });
+      return data;
+    },
+    enabled: tabIndex === 1 && historialView === 'contratos',
     keepPreviousData: true,
     staleTime: 10000,
   });
@@ -1988,6 +2162,10 @@ const AdminPage = () => {
     const { name, value } = e.target;
     setLocalPoderFilters(prev => ({...prev, [name]: value}));
   };
+  const handleContratoFilterChange = (e) => {
+    const { name, value } = e.target;
+    setLocalContratoFilters(prev => ({...prev, [name]: value}));
+  };
 
   const handleRefresh = () => {
     if (tabIndex === 0) {
@@ -1998,6 +2176,9 @@ const AdminPage = () => {
     }
     if (tabIndex === 1 && historialView === 'poderes') {
       refetchPoderes();
+    }
+    if (tabIndex === 1 && historialView === 'contratos') {
+      refetchContratos();
     }
   };
 
@@ -2224,6 +2405,20 @@ const AdminPage = () => {
                     iconPosition="start" 
                     label="Poderes" 
                   />
+                  <Tab 
+                    value="contratos" 
+                    icon={
+                      <Badge 
+                        badgeContent={contratosData?.totalRows || 0} 
+                        color="secondary"
+                        max={999}
+                      >
+                        <DescriptionIcon />
+                      </Badge>
+                    } 
+                    iconPosition="start" 
+                    label="Contratos" 
+                  />
                 </Tabs>
               </GlassCard>
 
@@ -2321,7 +2516,7 @@ const AdminPage = () => {
                 </Alert>
               )}
                 </>
-              ) : (
+              ) : historialView === 'poderes' ? (
                 <>
                   {/* Poderes Filters */}
                   <GlassCard>
@@ -2457,6 +2652,123 @@ const AdminPage = () => {
                       }}
                     >
                       Error al cargar los poderes. Verifica tu conexión e intenta nuevamente.
+                    </Alert>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Contratos Filters */}
+                  <GlassCard>
+                    <CardContent sx={{ p: 3 }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+                        <Stack direction="row" alignItems="center" spacing={2}>
+                          <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.1), color: theme.palette.info.main }}>
+                            <FilterList />
+                          </Avatar>
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            Filtros de Contratos
+                          </Typography>
+                        </Stack>
+                        <Chip 
+                          label={`${contratosData?.totalRows || 0} registros`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                      </Stack>
+
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} md={4}>
+                          <TextField 
+                            name="comitente" 
+                            label="Buscar por Comitente" 
+                            value={localContratoFilters.comitente} 
+                            onChange={handleContratoFilterChange} 
+                            variant="outlined" 
+                            fullWidth
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search color="action" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 3,
+                              }
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <TextField 
+                            name="abogado" 
+                            label="Buscar por Abogado" 
+                            value={localContratoFilters.abogado} 
+                            onChange={handleContratoFilterChange} 
+                            variant="outlined" 
+                            fullWidth
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search color="action" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 3,
+                              }
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <TextField 
+                            name="user" 
+                            label="Buscar por Usuario" 
+                            value={localContratoFilters.user} 
+                            onChange={handleContratoFilterChange} 
+                            variant="outlined" 
+                            fullWidth
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search color="action" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 3,
+                              }
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </GlassCard>
+
+                  <ContratosTable 
+                    rows={contratosData?.rows ?? []}
+                    totalRows={contratosData?.totalRows ?? 0}
+                    isLoading={isLoadingContratos}
+                    page={contratoPagination.pageIndex}
+                    rowsPerPage={contratoPagination.pageSize}
+                    onPageChange={(e, newPage) => setContratoPagination(prev => ({ ...prev, pageIndex: newPage }))}
+                    onRowsPerPageChange={(e) => setContratoPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value, 10), pageIndex: 0 }))}
+                    onDownloadContrato={handleDownloadContrato}
+                    onEditContrato={(contratoId) => navigate(`/admin/editar-contrato/${contratoId}`)}
+                  />
+
+                  {isErrorContratos && (
+                    <Alert 
+                      severity="error"
+                      sx={{ 
+                        borderRadius: 3,
+                        bgcolor: alpha(theme.palette.error.main, 0.1),
+                        border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`
+                      }}
+                    >
+                      Error al cargar los contratos. Verifica tu conexión e intenta nuevamente.
                     </Alert>
                   )}
                 </>

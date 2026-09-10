@@ -167,7 +167,6 @@ const saveBorrador = async (req, res) => {
 
 // PUT /api/solicitudes/borrador/:id
 const updateBorrador = async (req, res) => {
-  console.log(`[solicitudController] updateBorrador ${req.params.id} - body:`, JSON.stringify(req.body, null, 2));
   try {
     const borrador = await Solicitud.findById(req.params.id);
 

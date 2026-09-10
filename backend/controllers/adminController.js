@@ -1,6 +1,7 @@
 const Conciliacion = require('../models/conciliacionModel');
 const Solicitud = require('../models/solicitudModel');
 const Poder = require('../models/poderModel');
+const Contrato = require('../models/contratoModel');
 const User = require('../models/userModel');
 const Acreedor = require('../models/acreedorModel');
 
@@ -190,6 +191,56 @@ const getPoderes = async (req, res) => {
   }
 };
 
+// @desc    Obtener historial de contratos con paginación
+// @route   GET /api/admin/contratos
+// @access  Private/Admin
+const getContratos = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, filters = '[]', sorting = '[]' } = req.query;
+
+    const parsedFilters = JSON.parse(filters);
+    const query = {};
+    if (parsedFilters.length > 0) {
+      query.$and = parsedFilters.map(filter => {
+        return { [filter.id]: { $regex: filter.value, $options: 'i' } };
+      });
+    }
+
+    const parsedSorting = JSON.parse(sorting);
+    const sortOptions = parsedSorting.length > 0
+      ? parsedSorting.reduce((acc, sort) => {
+          acc[sort.id] = sort.desc ? -1 : 1;
+          return acc;
+        }, {})
+      : { createdAt: -1 };
+
+    const [contratos, count] = await Promise.all([
+      Contrato.find(query)
+        .populate('user', 'name email')
+        .select('-firma -firmaContractual')
+        .sort(sortOptions)
+        .lean(),
+      Contrato.countDocuments(query),
+    ]);
+
+    const totalRows = count;
+    const pageIndex = parseInt(page) - 1;
+    const pageSize = parseInt(limit);
+    const pagedResults = contratos.slice(
+      pageIndex * pageSize,
+      (pageIndex + 1) * pageSize
+    );
+
+    res.json({
+      rows: pagedResults,
+      pageCount: Math.ceil(totalRows / pageSize),
+      totalRows,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener contratos', error: error.message });
+  }
+};
+
 const uploadAnexo = async (req, res) => {
   try {
     const { tipo, id } = req.params;
@@ -232,4 +283,4 @@ const uploadAnexo = async (req, res) => {
 };
 
 
-module.exports = { getStats, getSolicitudes, getPoderes, uploadAnexo };
+module.exports = { getStats, getSolicitudes, getPoderes, getContratos, uploadAnexo };
