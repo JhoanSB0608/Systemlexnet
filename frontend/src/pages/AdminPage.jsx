@@ -1494,7 +1494,7 @@ function TabPanel(props) {
   );
 }
 
-const PoderesTable = ({ rows, totalRows, isLoading, page, rowsPerPage, onPageChange, onRowsPerPageChange, onDownloadPoder }) => {
+const PoderesTable = ({ rows, totalRows, isLoading, page, rowsPerPage, onPageChange, onRowsPerPageChange, onDownloadPoder, onEditPoder }) => {
   const theme = useTheme();
   const headCells = ['Fecha', 'Usuario', 'Poderdante', 'Apoderado', 'Entidad', 'Acciones'];
 
@@ -1555,6 +1555,9 @@ const PoderesTable = ({ rows, totalRows, isLoading, page, rowsPerPage, onPageCha
                   <TableCell sx={{ py: 2 }}>{poder.apoderado?.nombre || '—'}</TableCell>
                   <TableCell sx={{ py: 2 }}>{poder.destinatario?.entidad || '—'}</TableCell>
                   <TableCell sx={{ py: 2 }}>
+                    <Tooltip title="Editar Poder">
+                      <IconButton onClick={() => onEditPoder(poder._id)}><EditIcon /></IconButton>
+                    </Tooltip>
                     <Tooltip title="Descargar PDF">
                       <IconButton onClick={() => onDownloadPoder(poder._id)}><PictureAsPdf /></IconButton>
                     </Tooltip>
@@ -2441,6 +2444,7 @@ const AdminPage = () => {
                     onPageChange={(e, newPage) => setPoderPagination(prev => ({ ...prev, pageIndex: newPage }))}
                     onRowsPerPageChange={(e) => setPoderPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value, 10), pageIndex: 0 }))}
                     onDownloadPoder={handleDownloadPoder}
+                    onEditPoder={(poderId) => navigate(`/admin/editar-poder/${poderId}`)}
                   />
 
                   {isErrorPoderes && (

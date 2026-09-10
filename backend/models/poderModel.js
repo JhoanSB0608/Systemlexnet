@@ -38,7 +38,17 @@ const poderSchema = mongoose.Schema(
     firma: {
       source: { type: String, default: '' },
       data: { type: String, default: '' },
+      name: { type: String, default: '' },
+      url: { type: String, default: '' },
     },
+    firmaApoderado: {
+      source: { type: String, default: '' },
+      data: { type: String, default: '' },
+      name: { type: String, default: '' },
+      url: { type: String, default: '' },
+    },
+    estado: { type: String, enum: ['borrador', 'completa'], default: 'completa' },
+    seccionesGuardadas: { type: mongoose.Schema.Types.Mixed },
   },
   {
     timestamps: true,

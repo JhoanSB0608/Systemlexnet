@@ -1,13 +1,16 @@
 // borradorService.js
-// Servicios para el guardado parcial (auto-save) de solicitudes de insolvencia y conciliación.
+// Servicios para el guardado parcial (auto-save) de solicitudes de insolvencia,
+// conciliación y poderes.
 import axios from 'axios';
 import { API_BASE_URL } from './userService'; // Assuming this is defined in userService
 
 const INSOLVENCIA_API_URL = `${API_BASE_URL}/api/solicitudes`;
 const CONCILIACION_API_URL = `${API_BASE_URL}/api/conciliaciones`;
+const PODER_API_URL = `${API_BASE_URL}/api/poder`;
 
 export const TIPO_INSOLVENCIA = 'Solicitud de Insolvencia Económica de Persona Natural No Comerciante';
 export const TIPO_CONCILIACION = 'Solicitud de Conciliación Unificada';
+export const TIPO_PODER = 'Poder';
 
 const getToken = () => {
   const userInfo = localStorage.getItem('userInfo');
@@ -21,8 +24,11 @@ const getConfig = (options = {}) => {
   return { headers, ...options };
 };
 
-export const obtenerApiBaseDeTipo = (tipoSolicitud) =>
-  tipoSolicitud === TIPO_CONCILIACION ? CONCILIACION_API_URL : INSOLVENCIA_API_URL;
+export const obtenerApiBaseDeTipo = (tipoSolicitud) => {
+  if (tipoSolicitud === TIPO_CONCILIACION) return CONCILIACION_API_URL;
+  if (tipoSolicitud === TIPO_PODER) return PODER_API_URL;
+  return INSOLVENCIA_API_URL;
+};
 
 // Crea el borrador (o reutiliza el último activo del mismo tipo) en el servidor.
 export const guardarBorrador = async (payload, tipoSolicitud) => {
@@ -41,10 +47,12 @@ export const guardarBorrador = async (payload, tipoSolicitud) => {
 export const actualizarBorrador = async (borradorId, payload) => {
   try {
     const config = getConfig();
-    // El tipo se resuelve por el id: se prueba primero solicitudes y luego conciliaciones
+    // El tipo se resuelve por el id: se prueba primero solicitudes, luego
+    // conciliaciones y finalmente poderes.
     const endpoints = [
       `${INSOLVENCIA_API_URL}/borrador/${borradorId}`,
       `${CONCILIACION_API_URL}/borrador/${borradorId}`,
+      `${PODER_API_URL}/borrador/${borradorId}`,
     ];
     let lastError = null;
     for (const url of endpoints) {

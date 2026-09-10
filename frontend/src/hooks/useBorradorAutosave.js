@@ -1,8 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import borradorService, { TIPO_CONCILIACION } from '../services/borradorService';
+import borradorService, { TIPO_CONCILIACION, TIPO_PODER } from '../services/borradorService';
 
-const localStorageKey = (tipoSolicitud) =>
-  `systemlex_borrador_${tipoSolicitud === TIPO_CONCILIACION ? 'conciliacion' : 'insolvencia'}`;
+const localStorageKey = (tipoSolicitud) => {
+  if (tipoSolicitud === TIPO_CONCILIACION) return 'systemlex_borrador_conciliacion';
+  if (tipoSolicitud === TIPO_PODER) return 'systemlex_borrador_poder';
+  return 'systemlex_borrador_insolvencia';
+};
 
 /**
  * Hook para el guardado parcial (auto-save) por secciones de la solicitud.

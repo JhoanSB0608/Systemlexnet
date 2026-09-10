@@ -227,7 +227,6 @@ const saveBorrador = async (req, res) => {
 
 // PUT /api/conciliaciones/borrador/:id
 const updateBorrador = async (req, res) => {
-  console.log(`[conciliacionController] updateBorrador ${req.params.id} - body:`, JSON.stringify(req.body, null, 2));
   try {
     const borrador = await Conciliacion.findById(req.params.id);
 

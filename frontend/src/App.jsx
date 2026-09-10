@@ -21,6 +21,7 @@ import EditarConciliacionPage from './pages/EditarConciliacionPage';
 import ArchiverPage from './pages/ArchiverPage'; // New import
 import ArchivedRequestsListPage from './pages/ArchivedRequestsListPage';
 import PoderPage from './pages/PoderPage';
+import EditarPoderPage from './pages/EditarPoderPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ThemeModeProvider, useThemeMode } from './theme/ThemeContext';
@@ -162,6 +163,7 @@ const AuthProvider = ({ children }) => {
           <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
           <Route path="/admin/editar-solicitud/:id" element={<PrivateRoute><EditarInsolvenciaPage /></PrivateRoute>} />
           <Route path="/admin/editar-conciliacion/:id" element={<PrivateRoute><EditarConciliacionPage /></PrivateRoute>} />
+          <Route path="/admin/editar-poder/:id" element={<PrivateRoute><EditarPoderPage /></PrivateRoute>} />
           <Route path="/archiver-create" element={<PrivateRoute><ArchiverPage /></PrivateRoute>} />
           <Route path="/archiver" element={<PrivateRoute><ArchivedRequestsListPage /></PrivateRoute>} />
           <Route path="/poder" element={<PrivateRoute><PoderPage /></PrivateRoute>} />

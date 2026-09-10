@@ -66,6 +66,32 @@ export const generarPoderPdf = async (data) => {
   }
 };
 
+// GET /api/poder/:id
+// Trae un poder completo (incluye la firma) para el modo edición.
+export const getPoderById = async (poderId) => {
+  try {
+    const config = getConfig();
+    const response = await axios.get(`${API_URL}/${poderId}`, config);
+    return response.data;
+  } catch (err) {
+    console.error('Error obteniendo el poder:', err.response?.data || err.message || err);
+    throw err.response?.data || { message: err.message || 'Error obteniendo el poder' };
+  }
+};
+
+// PUT /api/poder/:id
+// Actualiza un poder existente (modo edición).
+export const actualizarPoder = async (poderId, payload) => {
+  try {
+    const config = getConfig();
+    const response = await axios.put(`${API_URL}/${poderId}`, payload, config);
+    return response.data;
+  } catch (err) {
+    console.error('Error actualizando el poder:', err.response?.data || err.message || err);
+    throw err.response?.data || { message: err.message || 'Error actualizando el poder' };
+  }
+};
+
 // GET /api/poder/:id/documento
 // Descarga el PDF de un poder previamente guardado en la base de datos.
 export const downloadPoderDocument = async (poderId) => {
@@ -97,6 +123,6 @@ export const downloadPoderDocument = async (poderId) => {
   }
 };
 
-const poderService = { generarPoderPdf, downloadPoderDocument };
+const poderService = { generarPoderPdf, getPoderById, actualizarPoder, downloadPoderDocument };
 
 export default poderService;

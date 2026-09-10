@@ -1,6 +1,61 @@
 const PdfPrinter = require('pdfmake');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
+
+// Descarga una imagen remota (URL) y la convierte a data URL base64 para que
+// pdfmake pueda incrustarla (las firmas "upload" viven en un archivo, p.ej. GCS).
+function fetchUrlToDataUrl(url) {
+  return new Promise((resolve) => {
+    const mod = url.startsWith('https:') ? https : http;
+    let settled = false;
+    const done = (value) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+    const req = mod.get(url, (res) => {
+      if (res.statusCode >= 400) {
+        res.resume();
+        return done(null);
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        const contentType = String(res.headers['content-type'] || 'image/png').split(';')[0].trim();
+        done(buf.length ? `data:${contentType};base64,${buf.toString('base64')}` : null);
+      });
+      res.on('error', () => done(null));
+    });
+    req.setTimeout(15000, () => {
+      req.destroy();
+      done(null);
+    });
+    req.on('error', () => done(null));
+  });
+}
+
+// Prepara las firmas (poderdante y apoderado) descargando las que vinieron como
+// URL de archivo subido para dejarlas como data URL (base64) antes de construir el PDF.
+// Las rutas relativas se resuelven contra `baseUrl` (host del backend que genera el PDF).
+async function loadFirmaImages(data = {}, baseUrl = '') {
+  const copy = { ...data };
+  for (const key of ['firma', 'firmaApoderado']) {
+    const sig = copy[key];
+    if (!sig || typeof sig !== 'object' || sig.source !== 'upload' || !sig.url || /^data:/i.test(sig.url)) continue;
+    let url = sig.url;
+    if (!/^https?:\/\//i.test(url) && baseUrl) {
+      url = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
+    }
+    if (!/^https?:\/\//i.test(url)) continue;
+    const dataUrl = await fetchUrlToDataUrl(url);
+    if (dataUrl) copy[key] = { ...sig, data: dataUrl };
+  }
+  return copy;
+}
 
 // ---------------------------------------------------------------------------
 // Fuentes: Calibri (cuerpo) y Verdana (encabezado), como el original.
@@ -161,7 +216,16 @@ const fechaPorPartes = dateStr => {
 };
 
 function buildPoderDocDefinition(data = {}) {
-  const { destinatario, poderdante, apoderado, siniestro } = data;
+  const { destinatario, poderdante, apoderado, siniestro, firma, firmaApoderado } = data;
+
+  // Imágenes de firma listas para incrustar (draw -> data URL; upload -> ya convertida).
+  const toSignatureImage = (sig) => {
+    if (!sig || typeof sig !== 'object') return null;
+    if (typeof sig.data === 'string' && /^data:image\//i.test(sig.data)) return sig.data;
+    return null;
+  };
+  const poderdanteSignature = toSignatureImage(firma);
+  const apoderadoSignature = toSignatureImage(firmaApoderado);
 
   const nombrePod = (poderdante?.nombre || '').toUpperCase();
   const nombreApo = (apoderado?.nombre || '').toUpperCase();
@@ -342,7 +406,9 @@ function buildPoderDocDefinition(data = {}) {
     L('Reconozco personería jurídica a nuestro apoderado en los términos y para los'),
     L('efectos del presente mandato.', { noStretch: true, margin: [0, 0, 0, SLOT] }),
 
-    ...firmas
+    ...firmas,
+    ...(poderdanteSignature ? [{ image: poderdanteSignature, fit: [110, 45], absolutePosition: { x: 90, y: 500 } }] : []),
+    ...(apoderadoSignature ? [{ image: apoderadoSignature, fit: [110, 45], absolutePosition: { x: 90, y: 640 } }] : []),
   ];
 
   return {
@@ -353,20 +419,17 @@ function buildPoderDocDefinition(data = {}) {
   };
 }
   
-  async function generatePoderPdf(data = {}) {
+  async function generatePoderPdf(data = {}, options = {}) {
+    const enriched = await loadFirmaImages(data, options.baseUrl);
+    const docDefinition = buildPoderDocDefinition(enriched);
+    const printer = new PdfPrinter(FONTS);
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
     return new Promise((resolve, reject) => {
-      try {
-        const docDefinition = buildPoderDocDefinition(data);
-        const printer = new PdfPrinter(FONTS);
-        const pdfDoc = printer.createPdfKitDocument(docDefinition);
-        const chunks = [];
-        pdfDoc.on('data', chunk => chunks.push(chunk));
-        pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-        pdfDoc.on('error', reject);
-        pdfDoc.end();
-      } catch (error) {
-        reject(error);
-      }
+      const chunks = [];
+      pdfDoc.on('data', (chunk) => chunks.push(chunk));
+      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on('error', reject);
+      pdfDoc.end();
     });
   }
   
