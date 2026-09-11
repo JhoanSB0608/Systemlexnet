@@ -96,7 +96,7 @@ function fetchUrlToDataUrl(url) {
 }
 
 async function loadFirmaImages(data = {}, baseUrl = '') {
-  const copy = { ...data };
+  const copy = (data && typeof data.toObject === 'function') ? data.toObject() : { ...data };
   const sig = copy.firma;
   if (!sig || typeof sig !== 'object' || sig.source !== 'upload' || !sig.url || /^data:/i.test(sig.url)) return copy;
   let url = sig.url;
@@ -118,18 +118,22 @@ const nombreCompletoDeudor = (deudor = {}) =>
 const identificacionDeudor = (deudor = {}) =>
   `identificado(a) con cédula de ciudadanía No. ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`;
 
-const datosDeudor = (deudor = {}) => [
-  `con domicilio en la ciudad de ${safe(deudor.ciudad)} – ${safe(deudor.departamento)},`,
-  `dirección física en ${safe(deudor.direccion)},`,
-  `correo electrónico ${safe(deudor.email)} y`,
-  `número telefónico ${safe(deudor.telefono)}`,
-].filter(Boolean).join(' ');
+const datosDeudor = (deudor = {}) => {
+  return [
+    `con domicilio en la ciudad de ${safe(deudor.ciudad)} – ${safe(deudor.departamento)}, `,
+    `dirección física en ${safe(deudor.direccion)}, correo electrónico `,
+    { text: safe(deudor.email), decoration: 'underline' }, // <-- Aquí aplicamos el subrayado
+    ` y número telefónico ${safe(deudor.telefono)}`
+  ];
+};
 
 // -------------------- Tabla de datos de un proceso judicial --------------------
 function procesoBloque(proceso = {}, index) {
+  // Ajusté las filas basándome en los campos de tu segunda imagen.
+  // Nota: Agregué 'Tipo de Proceso', verifica de qué propiedad de tu objeto 'proceso' viene 'En Contra'.
   const filas = [
-    ['Proceso Judicial No.', safe(proceso.radicado)],
-    ['Tipo de Proceso', safe(proceso.tipoProceso)],
+    ['Proceso Judicial', safe(proceso.tipoProceso)], 
+    ['Tipo de Proceso', safe(proceso.procesoJudicial || 'Proceso Ejecutivo')],
     ['Tipo de Juzgado', safe(proceso.juzgado)],
     ['Número de Radicación', safe(proceso.radicado)],
     ['Estado del Proceso', safe(proceso.estado)],
@@ -144,18 +148,37 @@ function procesoBloque(proceso = {}, index) {
 
   return {
     stack: [
-      { text: `Proceso Judicial No. ${safe(proceso.radicado)}`, bold: true, margin: [0, 6, 0, 2] },
       {
         table: {
           widths: ['34%', '66%'],
-          body: filas.map(([k, v]) => [
-            { text: k, bold: true, fontSize: 10 },
-            { text: v, fontSize: 10 },
-          ]),
+          body: [
+            // 1. Nueva fila superior con colSpan para que ocupe el ancho de ambas columnas
+            [
+              { 
+                text: `Proceso Judicial\nNo. ${safe(proceso.radicado)}`, 
+                colSpan: 2, 
+                alignment: 'center', // Centra el texto
+                fontSize: 10 
+              }, 
+              {} // IMPORTANTE: Al usar colSpan: 2, la siguiente celda debe ir vacía
+            ],
+            // 2. Mapeo dinámico del resto de las filas
+            ...filas.map(([k, v]) => [
+              { text: k, fontSize: 10 }, // Eliminado el "bold: true" para coincidir con la imagen
+              { text: v, fontSize: 10 },
+            ]),
+          ],
         },
-        layout: 'noBorders',
-        fontSize: 10,
-        margin: [12, 0, 0, 0],
+        layout: {
+          // 3. Grosor a 1 y eliminación de colores grises para un borde negro sólido
+          hLineWidth: () => 1,
+          vLineWidth: () => 1,
+          paddingLeft: () => 5,
+          paddingRight: () => 5,
+          paddingTop: () => 3,
+          paddingBottom: () => 3,
+        },
+        // 4. Eliminado el margin [12, 0, 0, 0] para que la tabla se alinee a la izquierda
       },
     ],
     margin: [0, index > 0 ? 10 : 0, 0, 0],
@@ -164,6 +187,7 @@ function procesoBloque(proceso = {}, index) {
 
 // -------------------- Definición del documento --------------------
 function buildLiquidacionDocDefinition(solicitud = {}) {
+  const normalized = (solicitud && typeof solicitud.toObject === 'function') ? solicitud.toObject() : solicitud;
   const {
     sede = {},
     deudor = {},
@@ -171,9 +195,10 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     acreencias = [],
     procesosJudiciales = [],
     informacionFinanciera = {},
+    entidadesFinancieras = [],
     firma = {},
     anexos = [],
-  } = solicitud;
+  } = normalized;
 
   const nombreDeudor = nombreCompletoDeudor(deudor);
   const identDeudor = identificacionDeudor(deudor);
@@ -193,7 +218,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
 
   const docDefinition = {
     pageSize: 'LETTER',
-    pageMargins: [MARGIN, MARGIN, MARGIN, MARGIN],
+    pageMargins: [90, 72, 90, 72],
     defaultStyle: {
       font: 'Times',
       fontSize: 11,
@@ -214,33 +239,49 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     margin: [0, 10, 0, 6],
   });
 
+  // Defines la constante (puedes ajustar el 15 al tamaño que prefieras)
+  const saltoDeLinea = { text: '', margin: [0, 15, 0, 0] };
+
   // ============ ENCABEZADO ============
   c.push(parrafo('SEÑOR', { margin: [0, 0, 0, 6] }));
-  c.push(parrafo(tituloJuzgado, { bold: true, margin: [0, 0, 0, 6] }));
+  c.push(parrafo(`${tituloJuzgado} De ${safe(sede.ciudad)} - ${safe(sede.departamento)} (REPARTO)`, { bold: true, margin: [0, 0, 0, 6] }));
   c.push(parrafo('E. S. D.', { margin: [0, 0, 0, 10] }));
+
+  c.push(saltoDeLinea);
 
   c.push(parrafo([
     { text: 'REFERENCIA: ', bold: true },
     { text: 'SOLICITUD DE APERTURA DE LIQUIDACIÓN PATRIMONIAL DIRECTA DE PERSONA NATURAL NO COMERCIANTE', bold: true },
   ], { margin: [0, 0, 0, 8] }));
 
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'SOLICITANTE / DEUDOR: ', bold: true },
     `${nombreDeudor} - C.C. No. ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`,
   ], { margin: [0, 0, 0, 8] }));
 
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
-    { text: `Yo ${nombreApoderado}, `, bold: false },
-    `mayor de edad, identificada con C.C. N° ${safe(apoderado.cedula)} de ${safe(apoderado.ciudadExpedicion)}, con T.P. ${safe(apoderado.tp)} del C.S.J., actuando en nombre y representación de mi prohijado ${nombreDeudor}, mayor de edad, ${identDeudor}, ${bloqueDatos}, respetuosamente me permito solicitar a su despacho la `,
+    { text: 'Yo ', bold: false },
+    { text: `${nombreApoderado}, `, bold: true },
+    { text: `mayor de edad, identificada con C.C. N° ${safe(apoderado.cedula)} de ${safe(apoderado.ciudadExpedicion)}, con T.P. ${safe(apoderado.tp)} del C.S.J., actuando en nombre y representación de mi prohijado `, bold: false }, 
+    { text: `${nombreDeudor}, `, bold: true },
+    { text: `mayor de edad, ${identDeudor}, ${bloqueDatos}, respetuosamente me permito solicitar a su despacho la `, bold: false },
     { text: 'APERTURA DEL PROCEDIMIENTO DE LIQUIDACIÓN PATRIMONIAL DIRECTA', bold: true },
     `, regulado en el Título IV de la Sección Tercera del Libro Tercero de la Ley 1564 de 2012 —Código General del Proceso—, con fundamento en los siguientes:`,
   ], { margin: [0, 0, 0, 10] }));
+
+  c.push(saltoDeLinea);
 
   // ============ I. IDENTIFICACIÓN DEL DEUDOR Y CALIDAD ============
   c.push(tituloSeccion('I. IDENTIFICACIÓN DEL DEUDOR Y CALIDAD'));
   c.push(parrafo(
     `Mi apoderado es persona natural no comerciante, por cuanto no ejerce profesionalmente actividades mercantiles, no se encuentra inscrito en el registro mercantil como comerciante y no desarrolla actos de comercio de forma habitual o profesional.`
   ));
+
+  c.push(saltoDeLinea);
 
   // ============ II. COMPETENCIA ============
   c.push(tituloSeccion('II. COMPETENCIA'));
@@ -255,37 +296,55 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     ', de conformidad con las disposiciones vigentes del Código General del Proceso.',
   ], { margin: [0, 0, 0, 10] }));
 
+  c.push(saltoDeLinea);
+
   // ============ III. PRETENSIONES ============
   c.push(tituloSeccion('III. PRETENSIONES'));
 
   c.push(parrafo([
-    { text: 'PRIMERA. ', bold: true },
-    `ADMITIR la presente solicitud de liquidación patrimonial directa promovida por ${nombreDeudor}, mayor de edad, ${identDeudor}.`,
+    { text: 'PRIMERA. ADMITIR ', bold: true },
+    'la presente solicitud de liquidación patrimonial directa promovida por ',
+    { text: nombreDeudor, bold: true },
+    ` mayor de edad, ${identDeudor}.`
   ]));
 
-  c.push(parrafo([
-    { text: 'SEGUNDA. ', bold: true },
-    `DECRETAR la apertura del procedimiento de liquidación patrimonial directa del patrimonio de ${nombreDeudor}, mayor de edad, ${identDeudor}, en su condición de persona natural no comerciante, conforme a las normas del Título IV de la Sección Tercera del Libro Tercero de la Ley 1564 de 2012, modificado por la Ley 2445 de 2025.`,
-  ]));
+  c.push(saltoDeLinea);
 
   c.push(parrafo([
-    { text: 'TERCERA. ', bold: true },
-    `DECLARAR que el deudor se encuentra en situación de cesación de pagos, por cuanto ha incumplido el pago de ${numObligaciones} obligaciones dinerarias a favor de ${numAcreedores} acreedores por más de noventa (90) días, obligaciones que representan el ${porcPasivo}% del total de su pasivo, exceptuando los créditos por libranzas que se descuentan directamente por nómina.`,
+    { text: 'SEGUNDA. DECRETAR ', bold: true },
+    'la apertura del procedimiento de liquidación patrimonial directa del patrimonio de ',
+    { text: nombreDeudor, bold: true },
+    `, mayor de edad, ${identDeudor}, en su condición de persona natural no comerciante, conforme a las normas del Título IV de la Sección Tercera del Libro Tercero de la Ley 1564 de 2012, modificado por la Ley 2445 de 2025.`
   ]));
 
-  c.push(parrafo([
-    { text: 'CUARTA. ', bold: true },
-    'TENER como presentada y vinculada al expediente la relación completa y actualizada de acreencias contenida en el Anexo No. 1 de esta solicitud, para efectos de determinar la cesación de pagos, la cuantía, los acreedores a notificar, la calificación y graduación de los créditos y las demás actuaciones propias del procedimiento.',
-  ]));
+  c.push(saltoDeLinea);
 
   c.push(parrafo([
-    { text: 'QUINTA. ', bold: true },
-    'RECONOCER que el deudor no posee bienes embargables, activos realizables, derechos patrimoniales disponibles, dineros, vehículos, inmuebles, inversiones, acciones, cuotas sociales, derechos fiduciarios o cualquier otro activo que pueda integrar la masa de liquidación, circunstancia que se manifiesta bajo la gravedad del juramento.',
+    { text: 'TERCERA. DECLARAR ', bold: true },
+    `que el deudor se encuentra en situación de cesación de pagos, por cuanto ha incumplido el pago de ${numObligaciones} obligaciones dinerarias a favor de ${numAcreedores} acreedores por más de noventa (90) días, obligaciones que representan el ${porcPasivo}% del total de su pasivo, exceptuando los créditos por libranzas que se descuentan directamente por nómina.`,
   ]));
 
+  c.push(saltoDeLinea);
+  
   c.push(parrafo([
-    { text: 'SEXTA. ', bold: true },
-    `DESIGNAR al deudor, señor(a) ${nombreDeudor}, mayor de edad, ${identDeudor}, como liquidador o administrador de la liquidación, bajo vigilancia, control e instrucciones del juzgado, con la obligación de rendir los informes, inventarios, cuentas y explicaciones que sean requeridos.`,
+    { text: 'CUARTA. TENER ', bold: true },
+    'como presentada y vinculada al expediente la relación completa y actualizada de acreencias contenida en el Anexo No. 1 de esta solicitud, para efectos de determinar la cesación de pagos, la cuantía, los acreedores a notificar, la calificación y graduación de los créditos y las demás actuaciones propias del procedimiento.',
+  ]));
+
+  c.push(saltoDeLinea);
+
+  c.push(parrafo([
+    { text: 'QUINTA. RECONOCER ', bold: true },
+    'que el deudor no posee bienes embargables, activos realizables, derechos patrimoniales disponibles, dineros, vehículos, inmuebles, inversiones, acciones, cuotas sociales, derechos fiduciarios o cualquier otro activo que pueda integrar la masa de liquidación, circunstancia que se manifiesta bajo la gravedad del juramento.',
+  ]));
+
+  c.push(saltoDeLinea);
+
+  c.push(parrafo([
+    { text: 'SEXTA. DESIGNAR ', bold: true },
+    'al deudor, señor(a) ',
+    { text: nombreDeudor, bold: true },
+    `, mayor de edad, ${identDeudor}, como liquidador o administrador de la liquidación, bajo vigilancia, control e instrucciones del juzgado, con la obligación de rendir los informes, inventarios, cuentas y explicaciones que sean requeridos.`
   ]));
 
   c.push(parrafo(
@@ -293,14 +352,18 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
   ));
 
   c.push(parrafo([
-    { text: 'OCTAVA. ', bold: true },
-    'EN SUBSIDIO DE LA PRETENSIÓN ANTERIOR, si el despacho considera improcedente la designación del deudor como liquidador o administrador, designar un liquidador perteneciente a la lista de auxiliares de la justicia o al listado legalmente aplicable, procurando que sus honorarios y gastos sean fijados de manera razonable, proporcional y acorde con la inexistencia de bienes en la masa liquidatoria.',
+    { text: 'OCTAVA. EN SUBSIDIO DE LA PRETENSIÓN ANTERIOR', bold: true },
+    ', si el despacho considera improcedente la designación del deudor como liquidador o administrador, designar un liquidador perteneciente a la lista de auxiliares de la justicia o al listado legalmente aplicable, procurando que sus honorarios y gastos sean fijados de manera razonable, proporcional y acorde con la inexistencia de bienes en la masa liquidatoria.',
   ]));
 
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
-    { text: 'NOVENA. ', bold: true },
-    'ORDENAR que se produzcan los efectos propios de la apertura del procedimiento de liquidación patrimonial directa, entre ellos:',
+    { text: 'NOVENA. ORDENAR', bold: true },
+    'que se produzcan los efectos propios de la apertura del procedimiento de liquidación patrimonial directa, entre ellos:',
   ]));
+
+  c.push(saltoDeLinea);
 
   c.push(parrafo([
     { text: 'a) ', bold: true },
@@ -311,128 +374,214 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     c.push(procesoBloque(proceso, idx));
   });
 
+  c.push(saltoDeLinea);
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'b) ', bold: true },
     'La suspensión de los procesos y actuaciones de cobro individual que deban someterse al fuero de atracción concursal.',
   ]));
+  c.push(saltoDeLinea);
   c.push(parrafo([
     { text: 'c) ', bold: true },
     'La prohibición de iniciar nuevos procesos, acciones o actuaciones de cobro individual por obligaciones causadas antes de la apertura del procedimiento, salvo las excepciones legales.',
   ]));
+  c.push(saltoDeLinea);
   c.push(parrafo([
     { text: 'd) ', bold: true },
     'La interrupción de la prescripción y la inoperancia de la caducidad respecto de los créditos sometidos al trámite, en los términos de la ley.',
   ]));
+  c.push(saltoDeLinea);
   c.push(parrafo([
     { text: 'e) ', bold: true },
     'La prevención a los acreedores para que se abstengan de adelantar actuaciones de cobro judicial, extrajudicial, administrativo o privado contrarias a los efectos del proceso de liquidación patrimonial.',
   ]));
+  c.push(saltoDeLinea);
 
   c.push(parrafo([
-    { text: 'DÉCIMA. ', bold: true },
-    'ORDENAR la publicación del aviso de apertura del procedimiento de liquidación patrimonial, mediante el mecanismo legalmente previsto, para que los acreedores no relacionados presenten oportunamente sus créditos, con los documentos que los soporten.',
+    { text: 'DÉCIMA. ORDENAR', bold: true },
+    'la publicación del aviso de apertura del procedimiento de liquidación patrimonial, mediante el mecanismo legalmente previsto, para que los acreedores no relacionados presenten oportunamente sus créditos, con los documentos que los soporten.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
-    { text: 'DÉCIMA PRIMERA. ', bold: true },
-    'REQUERIR a los acreedores relacionados y a quienes comparezcan al trámite para que presenten sus créditos con los respectivos soportes, discriminando capital, intereses, otros conceptos, naturaleza de la obligación, fecha de exigibilidad, garantías, privilegios, prelaciones y datos de contacto para notificaciones.',
+    { text: 'DÉCIMA PRIMERA. REQUERIR', bold: true },
+    'a los acreedores relacionados y a quienes comparezcan al trámite para que presenten sus créditos con los respectivos soportes, discriminando capital, intereses, otros conceptos, naturaleza de la obligación, fecha de exigibilidad, garantías, privilegios, prelaciones y datos de contacto para notificaciones.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
-    { text: 'DÉCIMA SEGUNDA. ', bold: true },
-    'OFICIAR a los despachos judiciales, entidades administrativas y autoridades de jurisdicción coactiva que aparecen relacionados en el Anexo No. 3, para que informen sobre la existencia, estado y cuantía de los procesos, medidas cautelares, embargos, secuestros, descuentos, títulos judiciales o actuaciones de cobro adelantadas contra el deudor.',
+    { text: 'DÉCIMA SEGUNDA. OFICIAR', bold: true },
+    'a los despachos judiciales, entidades administrativas y autoridades de jurisdicción coactiva que aparecen relacionados en el Anexo No. 3, para que informen sobre la existencia, estado y cuantía de los procesos, medidas cautelares, embargos, secuestros, descuentos, títulos judiciales o actuaciones de cobro adelantadas contra el deudor.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
-    { text: 'DÉCIMA TERCERA. ', bold: true },
-    'OFICIAR a las entidades financieras, cooperativas, fondos de empleados, pagadores, empleadores, administradoras de nómina y demás acreedores relacionados en el Anexo No. 1, para que informen sobre saldos, obligaciones, descuentos, embargos, garantías, procesos de cobro y datos de contacto actualizados del acreedor.',
+    { text: 'DÉCIMA TERCERA. OFICIAR', bold: true },
+    'a las entidades financieras, cooperativas, fondos de empleados, pagadores, empleadores, administradoras de nómina y demás acreedores relacionados en el Anexo No. 1, para que informen sobre saldos, obligaciones, descuentos, embargos, garantías, procesos de cobro y datos de contacto actualizados del acreedor.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
-    { text: 'DÉCIMA CUARTA. ', bold: true },
-    'OFICIAR a los operadores, fuentes y usuarios de información financiera, crediticia, comercial y de servicios, particularmente a:',
+    { text: 'DÉCIMA CUARTA. OFICIAR', bold: true },
+    'a los operadores, fuentes y usuarios de información financiera, crediticia, comercial y de servicios, particularmente a:',
   ]));
-  c.push(parrafo('1. TRANSUNION COLOMBIA S.A. – CIFIN.'));
-  c.push(parrafo('2. DATACRÉDITO EXPERIAN COLOMBIA S.A.'));
-  c.push(parrafo([
-    '3. Las demás centrales de riesgo, operadores, fuentes y usuarios de datos financieros, crediticios, comerciales y de servicios que registren obligaciones a nombre del deudor.',
-  ]));
+
+  c.push(saltoDeLinea);
+
+  const entidadesCentrales = (entidadesFinancieras || [])
+    .map((e) => safe(e && e.nombre).toUpperCase())
+    .filter(Boolean);
+
+  let listaCentrales;
+  if (entidadesCentrales.length) {
+    listaCentrales = entidadesCentrales.map((nombre, i) => `${i + 1}. ${nombre}`);
+    listaCentrales.push(`${entidadesCentrales.length + 1}. Las demás centrales de riesgo, operadores, fuentes y usuarios de datos financieros, crediticios, comerciales y de servicios que registren obligaciones a nombre del deudor.`);
+  } else {
+    listaCentrales = [
+      '1. TRANSUNION COLOMBIA S.A. – CIFIN.',
+      '2. DATACRÉDITO EXPERIAN COLOMBIA S.A.',
+      '3. Las demás centrales de riesgo, operadores, fuentes y usuarios de datos financieros, crediticios, comerciales y de servicios que registren obligaciones a nombre del deudor.',
+    ];
+  }
+  listaCentrales.forEach((item) => c.push(parrafo(item)));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo(
     'Para que, en el marco de sus competencias y con observancia de la Ley 1266 de 2008, la Ley 1581 de 2012 y demás disposiciones aplicables, incorporen en la historia crediticia del deudor la anotación referente a la apertura del procedimiento de liquidación patrimonial; identifiquen que las obligaciones se encuentran sometidas al trámite concursal; se abstengan de registrar información que contradiga las decisiones judiciales; y actualicen los datos reportados cuando se profiera providencia de adjudicación, terminación, cierre o cualquier decisión que determine el tratamiento jurídico de las obligaciones insolutas.'
   ));
+
+  c.push(saltoDeLinea);
+  
   c.push(parrafo([
-    { text: 'DÉCIMA QUINTA. ', bold: true },
-    `OFICIAR a la DIAN, a la Secretaría de Hacienda de ${safe(deudor.ciudad)} – ${safe(deudor.departamento)} y a las entidades públicas que puedan tener acreencias o procesos de cobro contra el deudor, a fin de que informen la existencia de obligaciones tributarias, procesos de cobro coactivo, medidas cautelares, saldos y demás información relevante para el procedimiento.`,
-  ]));
-  c.push(parrafo([
-    { text: 'DÉCIMA SEXTA. ', bold: true },
-    'DECRETAR las demás medidas, comunicaciones, requerimientos y decisiones que sean necesarias para asegurar la debida publicidad, universalidad, igualdad de los acreedores, transparencia y eficacia del procedimiento de liquidación patrimonial.',
+    { text: 'DÉCIMA QUINTA. OFICIAR ', bold: true },
+    `a la DIAN, a la Secretaría de Hacienda de ${safe(deudor.ciudad)} – ${safe(deudor.departamento)} y a las entidades públicas que puedan tener acreencias o procesos de cobro contra el deudor, a fin de que informen la existencia de obligaciones tributarias, procesos de cobro coactivo, medidas cautelares, saldos y demás información relevante para el procedimiento.`,
   ]));
 
+  c.push(saltoDeLinea);
+
+  c.push(parrafo([
+    { text: 'DÉCIMA SEXTA. DECRETAR ', bold: true },
+    'las demás medidas, comunicaciones, requerimientos y decisiones que sean necesarias para asegurar la debida publicidad, universalidad, igualdad de los acreedores, transparencia y eficacia del procedimiento de liquidación patrimonial.',
+  ]));
+
+  c.push(saltoDeLinea);
+
   // ============ IV. HECHOS ============
-  c.push({ ...tituloSeccion('IV. HECHOS'), pageBreak: 'before' });
+  c.push({ ...tituloSeccion('IV. HECHOS'), });
 
   c.push(parrafo([
     { text: 'PRIMERO. ', bold: true },
-    `El suscrito, ${nombreDeudor}, mayor de edad, ${identDeudor} y tiene su domicilio en el municipio de ${safe(deudor.ciudad)} – ${safe(deudor.departamento)}, dirección física en ${safe(deudor.direccion)}.`,
+    'El suscrito, ',
+    { text: nombreDeudor, bold: true },
+    `, mayor de edad, ${identDeudor} y tiene su domicilio en el municipio de${safe(deudor.ciudad)} – ${safe(deudor.departamento)}, dirección física en ${safe(deudor.direccion)}.`
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'SEGUNDO. ', bold: true },
     'El suscrito ostenta la condición de persona natural no comerciante, por cuanto no ejerce profesionalmente actividades mercantiles ni ejecuta actos de comercio de manera habitual y organizada.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'TERCERO. ', bold: true },
     'Mi situación económica se deterioró, debido a que adquirí los distintos créditos con el fin de mejorar mi calidad de vida y la de mi familia, sin embargo, el manejo dado no fue el adecuado, con el ánimo de sobrellevar las deudas sobre pase mi capacidad de pago, por lo que actualmente lo devengado no es suficiente para cubrir tantos mis gastos familiares y personales y estar al día con los pagos de mis obligaciones crediticias, razón por la cual me encuentro en mora en la mayoría de ellas y por ende inicio el presente proceso.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'CUARTO. ', bold: true },
     `Actualmente percibo ingresos mensuales aproximados de `,
     { text: `${letrasMoneda(ingresos)} (${formatCifra(ingresos)}),`.toUpperCase(), bold: true },
     ` provenientes del salario como ${safe(informacionFinanciera.cargoEmpleo)} del ${safe(informacionFinanciera.entidadEmpleadora)}.`,
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'QUINTO. ', bold: true },
     `Mis gastos mensuales necesarios para subsistencia y sostenimiento propio y de mi núcleo familiar ascienden aproximadamente a la suma de `,
     { text: `${letrasMoneda(gastos)} (${formatCifra(gastos)}),`.toUpperCase(), bold: true },
     ' correspondientes a vivienda, alimentación, salud, transporte, servicios públicos, educación, y demás egresos indispensables.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'SEXTO. ', bold: true },
     'Después de cubrir los gastos esenciales de subsistencia, cuento con una capacidad de pago aproximada de ',
     { text: `${letrasMoneda(capacidad)} (${formatCifra(capacidad)})`.toUpperCase(), bold: true },
     ' mensuales, suma insuficiente para atender el valor, número, exigibilidad y condiciones de las obligaciones pendientes.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'SÉPTIMO. ', bold: true },
     'A la fecha de presentación de esta solicitud, mantengo obligaciones dinerarias a favor de los acreedores relacionados en el ANEXO No. 1, denominado "RELACIÓN COMPLETA Y ACTUALIZADA DE ACREENCIAS".',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'OCTAVO. ', bold: true },
     'El capital total de las obligaciones relacionadas asciende aproximadamente a ',
     { text: `${letrasMoneda(cuantia)} (${formatCifra(cuantia)}),`.toUpperCase(), bold: true },
     ' sin perjuicio de la actualización de intereses, gastos, costos y demás conceptos que deban ser acreditados por los acreedores dentro del trámite.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'NOVENO. ', bold: true },
     `Me encuentro en situación de cesación de pagos, puesto que he incumplido el pago de ${numObligaciones} obligaciones dinerarias a favor de ${numAcreedores} acreedores por un término superior a noventa (90) días.`,
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'DÉCIMO. ', bold: true },
     `Las obligaciones vencidas e incumplidas por más de noventa (90) días representan aproximadamente el ${porcPasivo}% del pasivo total a mi cargo, superando el mínimo legal exigido para la configuración de la cesación de pago exceptuando los créditos por libranzas que se descuentan directamente por nómina.`,
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'DÉCIMO PRIMERO. ', bold: true },
     'En mi contra cursan los siguientes procesos o actuaciones de cobro:',
   ]));
 
+  c.push(saltoDeLinea);
+
   procesosJudiciales.forEach((proceso, idx) => {
     c.push(procesoBloque(proceso, idx));
   });
+
+  c.push(saltoDeLinea);
 
   c.push(parrafo([
     { text: 'DÉCIMO SEGUNDO. ', bold: true },
     'No poseo bienes embargables, activos realizables, inmuebles, vehículos, dineros disponibles en cuentas bancarias, inversiones, títulos, derechos fiduciarios, acciones, cuotas sociales, establecimientos de comercio, derechos económicos ni otros bienes que puedan integrar la masa de liquidación.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'DÉCIMO TERCERO. ', bold: true },
     'La inexistencia de bienes embargables y de activos realizables se declara bajo la gravedad del juramento. La información suministrada se soporta en los documentos anexos y se presenta de buena fe, de manera completa, veraz y actualizada.',
   ]));
+
+  c.push(saltoDeLinea);
+
   if (deudor.sociedadConyugalActiva) {
     c.push(parrafo([
       { text: 'DÉCIMO CUARTO. ', bold: true },
@@ -444,17 +593,25 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
       'No existe sociedad conyugal vigente, circunstancia que se informa al despacho para los efectos legales correspondientes.',
     ]));
   }
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'DÉCIMO QUINTO. ', bold: true },
     'Ante la inexistencia de masa activa y la ausencia de bienes realizables, la designación de un liquidador externo podría generar gastos sin que exista patrimonio suficiente para sufragarlos. Por ello, solicito que el despacho estudie, de encontrarlo jurídicamente viable, la posibilidad de designar al deudor como liquidador o administrador de la liquidación, bajo supervisión judicial y con los controles que sean procedentes.',
   ]));
+
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'DÉCIMO SEXTO. ', bold: true },
     'El suscrito se compromete a colaborar de manera plena y permanente con el despacho, el liquidador que se designe, los acreedores y las autoridades que intervengan; a suministrar información veraz; a comparecer cuando sea requerido; y a cumplir todas las órdenes que se impartan dentro del trámite.',
   ]));
 
+  c.push(saltoDeLinea);
+
   // ============ V. FUNDAMENTOS DE DERECHO ============
-  c.push({ ...tituloSeccion('V. FUNDAMENTOS DE DERECHO'), pageBreak: 'before' });
+  c.push({ ...tituloSeccion('V. FUNDAMENTOS DE DERECHO'), });
   c.push(parrafo('La presente solicitud se fundamenta en las siguientes disposiciones:'));
   const fundamentos = [
     'Artículos 29, 83, 228 y 229 de la Constitución Política de Colombia.',
@@ -466,7 +623,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     'Ley 1266 de 2008, Ley 1581 de 2012 y demás normas concordantes sobre protección de datos personales, información financiera, crediticia, comercial y de servicios.',
   ];
   fundamentos.forEach((f, i) => c.push(parrafo(`${i + 1}. ${f}`, { margin: [12, 4, 0, 4] })));
-
+  c.push(saltoDeLinea);
   // ============ VI. CUANTÍA ============
   c.push(tituloSeccion('VI. CUANTÍA'));
   c.push(parrafo([
@@ -474,6 +631,8 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     { text: `${letrasMoneda(cuantia)} (${formatCifra(cuantia)}).`.toUpperCase(), bold: true },
   ]));
   c.push(parrafo('Por lo anterior, el presente asunto es de MENOR cuantía y corresponde a la competencia del Juzgado Civil Municipal.'));
+
+  c.push(saltoDeLinea);
 
   // ============ VII. PRUEBAS ============
   c.push(tituloSeccion('VII. PRUEBAS'));
@@ -488,8 +647,10 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
   ];
   pruebas.forEach((p, i) => c.push(parrafo(`${i + 1}. ${p}`, { margin: [12, 4, 0, 4] })));
 
+  c.push(saltoDeLinea);
+
   // ============ VIII. JURAMENTO ============
-  c.push({ ...tituloSeccion('VIII. JURAMENTO'), pageBreak: 'before' });
+  c.push({ ...tituloSeccion('VIII. JURAMENTO'),});
   c.push(parrafo('Bajo la gravedad del juramento, que se entiende prestado con la presentación de este escrito, manifiesto que:'));
   const juramentos = [
     'Soy persona natural no comerciante.',
@@ -499,10 +660,12 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     'Los datos de contacto de los acreedores corresponden a la información que conozco y a la que aparece en los CERTIFICADO DE EXISTENCIA Y REPRESENTACIÓN LEGAL.',
     'La información contenida en los anexos se presenta de buena fe y con el propósito de permitir el trámite transparente, universal y ordenado de la liquidación patrimonial.',
   ];
-  juramentos.forEach((j, i) => c.push(parrafo(`${i + 1}. ${j}`, { margin: [12, 4, 0, 4] })));
-
+  juramentos.forEach((j, i) => c.push(parrafo(`${i + 1}. ${j}`, { margin: [12, 10, 0, 10] })));
+  
+  c.push(saltoDeLinea);
+  
   // ============ IX. NOTIFICACIONES ============
-  c.push({ ...tituloSeccion('IX. NOTIFICACIONES'), pageBreak: 'before' });
+  c.push({ ...tituloSeccion('IX. NOTIFICACIONES'),});
 
   const bloqueNotificacion = (titulo, filas) =>
     c.push({
@@ -513,12 +676,16 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
       margin: [0, 4, 0, 8],
     });
 
+  c.push(saltoDeLinea);
+
   bloqueNotificacion(`DEUDOR / SOLICITANTE: ${nombreDeudor}`, [
     `C.C. No. ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`,
     `Dirección: ${safe(deudor.direccion)}`,
     `Municipio: ${safe(deudor.ciudad)} – ${safe(deudor.departamento)}`,
     `Correo electrónico: ${safe(deudor.email)}`,
   ]);
+
+  c.push(saltoDeLinea);
 
   bloqueNotificacion(`LA SUSCRITA: ${nombreApoderado}`, [
     `C.C. No. ${safe(apoderado.cedula)} de ${safe(apoderado.ciudadExpedicion)} – Norte de Santander`,
@@ -528,10 +695,14 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     `Teléfono: ${safe(apoderado.telefono)}`,
   ]);
 
+  c.push(saltoDeLinea);
+
   c.push(parrafo([
     { text: 'ACREEDORES: ', bold: true },
     'Las direcciones físicas, electrónicas y demás datos de contacto conocidos de los acreedores se encuentran individualizados en el Anexo No. 1, denominado "Relación completa y actualizada de acreencias", se manifiesta bajo la gravedad de juramento que las direcciones físicas y electrónicas relacionadas, son las indicadas en cada uno de los certificados de representación legal de las entidades y los cuales, son debidamente anexados.',
   ], { margin: [0, 0, 0, 12] }));
+
+  c.push(saltoDeLinea);
 
   c.push(parrafo('Del señor Juez,', { margin: [0, 0, 0, 8] }));
   c.push(parrafo('Atentamente,', { margin: [0, 0, 0, 18] }));

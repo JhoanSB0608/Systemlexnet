@@ -87,6 +87,10 @@ const infoFinancieraSchema = new mongoose.Schema({
   tieneBienesEmbargables: { type: Boolean, default: false },
 });
 
+const entidadFinancieraSchema = new mongoose.Schema({
+  nombre: { type: String },
+});
+
 // -------------------- Esquema principal --------------------
 const liquidacionSchema = new mongoose.Schema(
   {
@@ -105,6 +109,7 @@ const liquidacionSchema = new mongoose.Schema(
     acreencias: [acreenciaSchema],
     procesosJudiciales: [procesoSchema],
     informacionFinanciera: infoFinancieraSchema,
+    entidadesFinancieras: [entidadFinancieraSchema],
     anexos: [anexoSchema],
     firma: firmaSchema,
   },

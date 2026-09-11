@@ -25,7 +25,8 @@ import {
   Restore as RestoreIcon,
   CloudDone as CloudDoneIcon,
   CloudUpload as CloudUploadIcon,
-  AccountBalanceWallet as AccountBalanceWalletIcon
+  AccountBalanceWallet as AccountBalanceWalletIcon,
+  Business as BusinessIcon
 } from '@mui/icons-material';
 import SignatureCanvas from 'react-signature-canvas';
 import LocationSelector from './LocationSelector';
@@ -223,6 +224,7 @@ const buildFormattedData = (initialData) => ({
     ...p,
     valor: p.valor ?? '',
   })),
+  entidadesFinancieras: initialData.entidadesFinancieras || [],
   informacionFinanciera: initialData.informacionFinanciera || {},
   anexos: initialData.anexos?.map((a) => ({
     ...a,
@@ -246,6 +248,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       apoderado: { nombreCompleto: '', cedula: '', ciudadExpedicion: '', tp: '', direccion: '', email: '', telefono: '' },
       acreencias: [],
       procesosJudiciales: [],
+      entidadesFinancieras: [],
       informacionFinanciera: {
         cuantiaTotal: '', numeroObligaciones: '', numeroAcreedores: '', porcentajePasivo: '',
         ingresosMensuales: '', entidadEmpleadora: '', cargoEmpleo: '', gastosMensuales: '',
@@ -258,6 +261,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
   const { fields: acreenciasFields, append: appendAcreencia, remove: removeAcreencia } = useFieldArray({ control, name: 'acreencias', rules: { minLength: { value: 1, message: 'Debe agregar al menos una obligación / acreencia' } } });
   const { fields: procesosFields, append: appendProceso, remove: removeProceso } = useFieldArray({ control, name: 'procesosJudiciales' });
+  const { fields: entidadesFields, append: appendEntidad, remove: removeEntidad } = useFieldArray({ control, name: 'entidadesFinancieras' });
   const { fields: anexosFields, append: appendAnexo, remove: removeAnexo } = useFieldArray({ control, name: 'anexos' });
 
   const [tabValue, setTabValue] = useState(0);
@@ -272,6 +276,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     apoderado: false,
     acreencias: false,
     procesosJudiciales: false,
+    entidadesFinancieras: false,
     informacionFinanciera: false,
     anexos: false,
     firma: false,
@@ -357,7 +362,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       } else {
         setSavedSections({
           sede: true, deudor: true, apoderado: true, acreencias: true,
-          procesosJudiciales: true, informacionFinanciera: true, anexos: true, firma: true,
+          procesosJudiciales: true, entidadesFinancieras: true, informacionFinanciera: true, anexos: true, firma: true,
         });
       }
       finish();
@@ -485,6 +490,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       case 'apoderado': fieldsToValidate = ['apoderado']; break;
       case 'acreencias': fieldsToValidate = ['acreencias']; break;
       case 'procesosJudiciales': fieldsToValidate = ['procesosJudiciales']; break;
+      case 'entidadesFinancieras': fieldsToValidate = ['entidadesFinancieras']; break;
       case 'informacionFinanciera': fieldsToValidate = ['informacionFinanciera']; break;
       case 'anexos': fieldsToValidate = ['anexos']; break;
       case 'firma': fieldsToValidate = ['firma']; break;
@@ -590,6 +596,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         apoderado: false,
         acreencias: false,
         procesosJudiciales: false,
+        entidadesFinancieras: false,
         informacionFinanciera: false,
         anexos: false,
         firma: false,
@@ -625,6 +632,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     { key: 'apoderado', label: 'Apoderado', icon: GavelIcon, color: '#ff9800' },
     { key: 'acreencias', label: 'Obligaciones', icon: ReceiptIcon, color: '#ff5722' },
     { key: 'procesosJudiciales', label: 'Procesos', icon: AccountBalanceIcon, color: '#f44336' },
+    { key: 'entidadesFinancieras', label: 'Centrales de Riesgo', icon: BusinessIcon, color: '#9c27b0' },
     { key: 'informacionFinanciera', label: 'Financiera', icon: TrendingUpIcon, color: '#4caf50' },
     { key: 'anexos', label: 'Anexos', icon: AttachFileIcon, color: '#009688' },
     { key: 'firma', label: 'Firma', icon: CreateIcon, color: '#795548' },
@@ -1003,13 +1011,39 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
               </GlassCard>
             ))}
             <Button variant="outlined" onClick={() => appendProceso({})} startIcon={<AddIcon />}>Añadir Proceso Judicial</Button>
-            <Button variant="contained" onClick={() => handleSaveSection('procesosJudiciales', 5)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+            <Button variant="contained" onClick={() => handleSaveSection('procesosJudiciales', 6)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
               {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
             </Button>
           </Stack>
         </TabPanel>
 
         <TabPanel value={tabValue} index={5}>
+          <Stack spacing={3}>
+            <Typography variant="h6">Centrales de Riesgo y Entidades Financieras</Typography>
+            <Alert severity="info" sx={{ mb: 1 }}>
+              Estas entidades se listarán dinámicamente en la pretensión DÉCIMA CUARTA del documento. La cláusula de "demás centrales de riesgo" se agrega automáticamente al final.
+            </Alert>
+            {entidadesFields.map((field, index) => (
+              <GlassCard key={field.id} sx={{ p: 3 }}>
+                <Stack spacing={2}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Chip avatar={<Avatar><BusinessIcon /></Avatar>} label={`Entidad Financiera / Central de Riesgo #${index + 1}`} />
+                    <IconButton onClick={() => removeEntidad(index)} size="small"><DeleteIcon /></IconButton>
+                  </Stack>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}><GlassTextField {...register(`entidadesFinancieras.${index}.nombre`, { required: 'Campo requerido' })} label="Nombre de la Entidad" fullWidth error={errors.entidadesFinancieras?.[index]?.nombre} helperText={errors.entidadesFinancieras?.[index]?.nombre?.message} /></Grid>
+                  </Grid>
+                </Stack>
+              </GlassCard>
+            ))}
+            <Button variant="outlined" onClick={() => appendEntidad({})} startIcon={<AddIcon />}>Añadir Entidad Financiera / Central de Riesgo</Button>
+            <Button variant="contained" onClick={() => handleSaveSection('entidadesFinancieras', 6)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+              {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
+            </Button>
+          </Stack>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={6}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={3}>
               <Typography variant="h6">Información Financiera</Typography>
@@ -1030,14 +1064,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                   />
                 </Grid>
               </Grid>
-              <Button variant="contained" onClick={() => handleSaveSection('informacionFinanciera', 6)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+              <Button variant="contained" onClick={() => handleSaveSection('informacionFinanciera', 7)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
                 {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
               </Button>
             </Stack>
           </GlassCard>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={6}>
+        <TabPanel value={tabValue} index={7}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={2}>
               <Typography variant="h6">Pruebas y Anexos</Typography>
@@ -1086,14 +1120,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                 );
               })}
               <Button variant="outlined" onClick={() => appendAnexo({ name: '', file: null, descripcion: '', url: '' })} startIcon={<AddIcon />}>Añadir Anexo</Button>
-              <Button variant="contained" onClick={() => handleSaveSection('anexos', 7)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+              <Button variant="contained" onClick={() => handleSaveSection('anexos', 8)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
                 {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
               </Button>
             </Stack>
           </GlassCard>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={7}>
+        <TabPanel value={tabValue} index={8}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={3}>
               <Typography variant="h6">Firma del Apoderado</Typography>
