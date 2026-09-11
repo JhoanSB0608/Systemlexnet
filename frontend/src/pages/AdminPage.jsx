@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { getAdminStats, getAdminSolicitudes, getAdminPoderes, getAdminContratos, uploadAnexo } from '../services/adminService';
 import { downloadSolicitudDocument } from '../services/solicitudService';
 import { downloadConciliacionDocument } from '../services/conciliacionService';
+import { downloadLiquidacionDocument } from '../services/liquidacionService';
 import { downloadPoderDocument } from '../services/poderService';
 import { downloadContratoDocument } from '../services/contratoService';
 import { downloadFile, uploadFile as fileStorageServiceUploadFile } from '../services/fileStorageService';
@@ -642,6 +643,7 @@ const DetailItem = ({ label, value, icon: Icon }) => {
 
 const DeudorModal = ({ open, onClose, deudor }) => {
   if (!deudor) return null;
+  const nombreCompleto = deudor.nombreCompleto || [deudor.primerNombre, deudor.segundoNombre, deudor.primerApellido, deudor.segundoApellido].filter(Boolean).join(' ');
   return (
     <GlassModal open={open} onClose={onClose} title="Información del Deudor" maxWidth="lg">
       <Stack spacing={3}>
@@ -663,14 +665,14 @@ const DeudorModal = ({ open, onClose, deudor }) => {
                 fontWeight: 800,
               }}
             >
-              {deudor.nombreCompleto?.charAt(0) || 'D'}
+              {nombreCompleto?.charAt(0) || 'D'}
             </Avatar>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                {deudor.nombreCompleto}
+                {nombreCompleto}
               </Typography>
               <Chip 
-                label={`${deudor.tipoIdentificacion} - ${deudor.cedula}`}
+                label={`${deudor.tipoIdentificacion || 'C.C'} - ${deudor.cedula}`}
                 size="small"
                 sx={{ mt: 1 }}
               />
@@ -679,16 +681,17 @@ const DeudorModal = ({ open, onClose, deudor }) => {
         </Box>
 
         <Grid container spacing={2}>
-          <DetailItem label="Lugar de Expedición" value={`${deudor.ciudadExpedicion}, ${deudor.departamentoExpedicion}`} icon={Person} />
+          <DetailItem label="Lugar de Expedición" value={`${deudor.ciudadExpedicion || ''}${deudor.departamentoExpedicion ? `, ${deudor.departamentoExpedicion}` : ''}`.trim() || 'N/A'} icon={Person} />
           <DetailItem label="Teléfono" value={deudor.telefono} icon={Person} />
           <DetailItem label="Email" value={deudor.email} icon={Person} />
           <DetailItem label="País de Origen" value={deudor.paisOrigen} icon={Person} />
-          <DetailItem label="Fecha de Nacimiento" value={new Date(deudor.fechaNacimiento).toLocaleDateString()} icon={Person} />
+          <DetailItem label="Fecha de Nacimiento" value={deudor.fechaNacimiento ? new Date(deudor.fechaNacimiento).toLocaleDateString() : 'N/A'} icon={Person} />
           <DetailItem label="Género" value={deudor.genero} icon={Person} />
           <DetailItem label="Estado Civil" value={deudor.estadoCivil} icon={Person} />
           <DetailItem label="Etnia" value={deudor.etnia} icon={Person} />
           <DetailItem label="Discapacidad" value={deudor.discapacidad} icon={Person} />
-          <DetailItem label="Domicilio" value={`${deudor.domicilio}, ${deudor.ciudad}, ${deudor.departamento}`} icon={Person} />
+          <DetailItem label="Domicilio" value={`${deudor.domicilio || ''}${deudor.ciudad ? `, ${deudor.ciudad}` : ''}${deudor.departamento ? `, ${deudor.departamento}` : ''}`.trim() || 'N/A'} icon={Person} />
+          <DetailItem label="Dirección (Liquidación)" value={deudor.direccion} icon={Home} />
           <DetailItem label="Tipo Persona" value={deudor.tipoPersonaNatural} icon={Person} />
         </Grid>
       </Stack>
@@ -720,7 +723,7 @@ const AcreedoresModal = ({ open, onClose, acreedores }) => {
           <TableBody>
             {acreedores.map((item, index) => {
               const acreedor = item.acreedor || {};
-              const nombre = typeof acreedor === 'object' ? (acreedor.nombre || 'N/A') : (acreedor || 'N/A');
+              const nombre = typeof acreedor === 'object' ? (acreedor.nombre || item.nombreAcreedor || 'N/A') : (acreedor || item.nombreAcreedor || 'N/A');
               const documento = typeof acreedor === 'object' 
                 ? `${acreedor.tipoDoc || ''} ${acreedor.nitCc || acreedor.nit || acreedor.documento || ''}`.trim() || 'N/A'
                 : 'N/A';
@@ -864,7 +867,9 @@ const AnexosSection = ({ anexos, solicitudId, tipoSolicitud, onUploadSuccess }) 
 
         uploadFileToBackend({ 
             id: solicitudId, 
-            tipo: tipoSolicitud.startsWith('Solicitud de Insolvencia') ? 'insolvencia' : 'conciliacion', 
+            tipo: tipoSolicitud.startsWith('Solicitud de Insolvencia')
+              ? 'insolvencia'
+              : (tipoSolicitud.startsWith('Solicitud de Liquidación') ? 'liquidacion' : 'conciliacion'), 
             filename: uniqueFilename || ' ',
             fileUrl: fileUrl,
             description: description,
@@ -1332,6 +1337,145 @@ const ConciliacionDetails = ({ solicitud, onUploadSuccess }) => {
   )
 };
 
+const LiquidacionDetails = ({ solicitud, onUploadSuccess }) => {
+  const theme = useTheme();
+  const { deudor = {}, apoderado = {}, acreencias = [], procesosJudiciales = [], informacionFinanciera = {}, sede = {} } = solicitud;
+
+  const nombreCompletoDeudor = [deudor.primerNombre, deudor.segundoNombre, deudor.primerApellido, deudor.segundoApellido].filter(Boolean).join(' ');
+  const totalCapital = acreencias.reduce((s, a) => s + (Number(a.capital) || 0), 0);
+  const totalProcesos = procesosJudiciales.reduce((s, p) => s + (Number(p.valor) || 0), 0);
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <GlassAccordion title="Sede / Juzgado" icon={Balance} defaultExpanded>
+        <Grid container spacing={2}>
+          <DetailItem label="Juzgado" value={sede.juzgado} icon={Gavel} />
+          <DetailItem label="Departamento" value={sede.departamento} icon={Home} />
+          <DetailItem label="Ciudad" value={sede.ciudad} icon={Home} />
+        </Grid>
+      </GlassAccordion>
+
+      <GlassAccordion title="Deudor" icon={Person} defaultExpanded>
+        <Grid container spacing={2}>
+          <DetailItem label="Nombre Completo" value={nombreCompletoDeudor} icon={Person} />
+          <DetailItem label="Cédula" value={deudor.cedula} icon={Person} />
+          <DetailItem label="Ciudad de Expedición" value={deudor.ciudadExpedicion} icon={Person} />
+          <DetailItem label="Dirección" value={deudor.direccion} icon={Home} />
+          <DetailItem label="Email" value={deudor.email} icon={Person} />
+          <DetailItem label="Teléfono" value={deudor.telefono} icon={Person} />
+          <DetailItem label="Domicilio" value={`${deudor.ciudad}, ${deudor.departamento}`} icon={Home} />
+          <DetailItem label="Persona Natural No Comerciante" value={deudor.noComerciante ? 'Sí' : 'No'} icon={Person} />
+          <DetailItem label="Sociedad Conyugal Activa" value={deudor.sociedadConyugalActiva ? 'Sí' : 'No'} icon={FamilyRestroom} />
+          {deudor.sociedadConyugalActiva && (
+            <>
+              <DetailItem label="Cónyuge" value={deudor.nombreConyuge} icon={FamilyRestroom} />
+              <DetailItem label="Cédula del Cónyuge" value={`${deudor.cedulaConyuge} de ${deudor.ciudadExpedicionConyuge}`} icon={FamilyRestroom} />
+            </>
+          )}
+        </Grid>
+      </GlassAccordion>
+
+      <GlassAccordion title="Apoderado" icon={Handshake}>
+        <Grid container spacing={2}>
+          <DetailItem label="Nombre Completo" value={apoderado.nombreCompleto} icon={Person} />
+          <DetailItem label="Cédula" value={`${apoderado.cedula} de ${apoderado.ciudadExpedicion}`} icon={Person} />
+          <DetailItem label="Tarjeta Profesional" value={apoderado.tp} icon={Gavel} />
+          <DetailItem label="Dirección" value={apoderado.direccion} icon={Home} />
+          <DetailItem label="Email" value={apoderado.email} icon={Person} />
+          <DetailItem label="Teléfono" value={apoderado.telefono} icon={Person} />
+        </Grid>
+      </GlassAccordion>
+
+      <GlassAccordion title={`Obligaciones / Acreencias (Total Capital: $${totalCapital.toLocaleString()})`} icon={AttachMoney}>
+        <TableContainer
+          sx={{
+            borderRadius: 3,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.4)} 0%, ${alpha(theme.palette.background.paper, 0.1)} 100%)`,
+            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          }}
+        >
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
+                <TableCell sx={{ fontWeight: 700 }}>Acreedor</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Tipo</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Naturaleza</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700 }}>Capital</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {acreencias.map((a, i) => (
+                <TableRow key={i}>
+                  <TableCell>{a.nombreAcreedor}</TableCell>
+                  <TableCell>{a.tipoAcreedor}</TableCell>
+                  <TableCell>{a.naturaleza}</TableCell>
+                  <TableCell align="right">
+                    <Chip label={`$${(Number(a.capital) || 0).toLocaleString()}`} color="success" size="small" sx={{ fontWeight: 700 }} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </GlassAccordion>
+
+      <GlassAccordion title={`Procesos Judiciales (Valor Total: $${totalProcesos.toLocaleString()})`} icon={Balance}>
+        <Stack spacing={2}>
+          {procesosJudiciales.map((p, i) => (
+            <Box
+              key={i}
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.05)} 0%, transparent 100%)`,
+                border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`,
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                <Typography sx={{ fontWeight: 700 }}>{p.tipoProceso} - {p.juzgado}</Typography>
+                <Chip label={p.radicado} size="small" color="error" />
+              </Stack>
+              <Grid container spacing={1}>
+                <DetailItem label="Estado" value={p.estado} icon={Timeline} />
+                <DetailItem label="Demandante" value={p.demandante} icon={Person} />
+                <DetailItem label="Demandado" value={p.demandado} icon={Person} />
+                <DetailItem label="Valor" value={p.valor ? `$${(Number(p.valor)).toLocaleString()}` : 'N/A'} icon={AttachMoney} />
+                <DetailItem label="Ubicación" value={`${p.ciudad}, ${p.departamento}`} icon={Home} />
+                <DetailItem label="Dirección" value={p.direccionJuzgado} icon={Home} />
+                <DetailItem label="Dirección Electrónica" value={p.emailJuzgado} icon={Person} />
+              </Grid>
+            </Box>
+          ))}
+        </Stack>
+      </GlassAccordion>
+
+      <GlassAccordion title="Información Financiera" icon={TrendingUpIcon}>
+        <Grid container spacing={2}>
+          <DetailItem label="Cuantía Total" value={informacionFinanciera.cuantiaTotal ? `$${(Number(informacionFinanciera.cuantiaTotal)).toLocaleString()}` : 'N/A'} icon={AttachMoney} />
+          <DetailItem label="Número de Obligaciones" value={informacionFinanciera.numeroObligaciones} icon={Receipt} />
+          <DetailItem label="Número de Acreedores" value={informacionFinanciera.numeroAcreedores} icon={GroupIcon} />
+          <DetailItem label="Porcentaje del Pasivo" value={informacionFinanciera.porcentajePasivo ? `${informacionFinanciera.porcentajePasivo}%` : 'N/A'} icon={TrendingUpIcon} />
+          <DetailItem label="Ingresos Mensuales" value={informacionFinanciera.ingresosMensuales ? `$${(Number(informacionFinanciera.ingresosMensuales)).toLocaleString()}` : 'N/A'} icon={AttachMoney} />
+          <DetailItem label="Entidad Empleadora" value={informacionFinanciera.entidadEmpleadora} icon={Business} />
+          <DetailItem label="Cargo" value={informacionFinanciera.cargoEmpleo} icon={Person} />
+          <DetailItem label="Gastos Mensuales" value={informacionFinanciera.gastosMensuales ? `$${(Number(informacionFinanciera.gastosMensuales)).toLocaleString()}` : 'N/A'} icon={AttachMoney} />
+          <DetailItem label="Capacidad de Pago" value={informacionFinanciera.capacidadPago ? `$${(Number(informacionFinanciera.capacidadPago)).toLocaleString()}` : 'N/A'} icon={AttachMoney} />
+          <DetailItem label="¿Posee Bienes Embargables?" value={informacionFinanciera.tieneBienesEmbargables ? 'Sí' : 'No'} icon={HomeWork} />
+        </Grid>
+      </GlassAccordion>
+
+      <GlassAccordion title="Documentos/Anexos" icon={Folder} defaultExpanded>
+        <AnexosSection
+          anexos={solicitud.anexos}
+          solicitudId={solicitud._id}
+          tipoSolicitud={solicitud.tipoSolicitud}
+          onUploadSuccess={onUploadSuccess}
+        />
+      </GlassAccordion>
+    </Box>
+  );
+};
+
 const EnhancedTable = ({ table, isLoading, solicitudesData, navigate, onDownload, onOpenModal, onUploadSuccess }) => {
   const theme = useTheme();
 
@@ -1438,6 +1582,8 @@ const EnhancedTable = ({ table, isLoading, solicitudesData, navigate, onDownload
                             <TableCell colSpan={row.getVisibleCells().length} sx={{ p: 0 }}>
                                 {row.original.tipoSolicitud.startsWith('Solicitud de Insolvencia') ?
                                     <InsolvenciaDetails solicitud={row.original} onUploadSuccess={onUploadSuccess} /> :
+                                    row.original.tipoSolicitud.startsWith('Solicitud de Liquidación') ?
+                                    <LiquidacionDetails solicitud={row.original} onUploadSuccess={onUploadSuccess} /> :
                                     <ConciliacionDetails solicitud={row.original} onUploadSuccess={onUploadSuccess} />
                                 }
                             </TableCell>
@@ -1793,6 +1939,13 @@ const AdminPage = () => {
     try {
       if (tipoSolicitud === 'Solicitud de Conciliación Unificada') {
         await downloadConciliacionDocument(solicitudId, format, anexo);
+      } else if (tipoSolicitud.startsWith('Solicitud de Liquidación')) {
+        if (format !== 'pdf') {
+          toast.dismiss(toastId);
+          toast.info('El documento de Liquidación solo está disponible en formato PDF.');
+          return;
+        }
+        await downloadLiquidacionDocument(solicitudId, format);
       } else {
         await downloadSolicitudDocument(solicitudId, format, anexo);
       }
@@ -1997,8 +2150,10 @@ const AdminPage = () => {
       accessorKey: 'tipoSolicitud', 
       header: 'Tipo',
       cell: ({ getValue }) => {
-        const isI = getValue().startsWith("Solicitud de Insolvencia");
-        return <Chip label={isI ? "Insolvencia" : "Conciliación"} size="small" color={isI ? "error" : "primary"}/>
+        const val = getValue() || '';
+        const isI = val.startsWith("Solicitud de Insolvencia");
+        const isL = val.startsWith("Solicitud de Liquidación");
+        return <Chip label={isI ? "Insolvencia" : (isL ? "Liquidación" : "Conciliación")} size="small" color={isI ? "error" : (isL ? "warning" : "primary")}/>
       }
     },
     {
@@ -2027,6 +2182,10 @@ const AdminPage = () => {
             if (original.tipoSolicitud.startsWith('Solicitud de Insolvencia')) {
                 return <Button onClick={() => handleOpenModal('deudor', original.deudor)}>{original.deudor?.nombreCompleto}</Button>
             }
+            if (original.tipoSolicitud.startsWith('Solicitud de Liquidación')) {
+                const d = original.deudor || {};
+                return <Button onClick={() => handleOpenModal('deudor', original.deudor)}>{[d.primerNombre, d.segundoNombre, d.primerApellido, d.segundoApellido].filter(Boolean).join(' ')}</Button>
+            }
             return null;
         }
     },
@@ -2036,6 +2195,13 @@ const AdminPage = () => {
         cell: ({ row }) => {
             const { original } = row;
             if (original.tipoSolicitud.startsWith('Solicitud de Insolvencia')) {
+                return (
+                    <IconButton onClick={() => handleOpenModal('acreedores', original.acreencias)}>
+                        <GroupIcon />
+                    </IconButton>
+                );
+            }
+            if (original.tipoSolicitud.startsWith('Solicitud de Liquidación')) {
                 return (
                     <IconButton onClick={() => handleOpenModal('acreedores', original.acreencias)}>
                         <GroupIcon />
@@ -2116,6 +2282,24 @@ const AdminPage = () => {
                   ) : (
                     <Tooltip title="Editar Solicitud de Conciliación">
                       <IconButton onClick={() => navigate(`/admin/editar-conciliacion/${original._id}`)}><EditIcon /></IconButton>
+                    </Tooltip>
+                  )
+                )}
+                {original.tipoSolicitud.startsWith('Solicitud de Liquidación') && (
+                  isDraft ? (
+                    <Tooltip title="Continuar borrador de Liquidación">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => navigate(`/admin/editar-liquidacion/${original._id}`)}
+                        sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, fontSize: '0.75rem' }}
+                      >
+                        Continuar
+                      </Button>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip title="Editar Solicitud de Liquidación">
+                      <IconButton onClick={() => navigate(`/admin/editar-liquidacion/${original._id}`)}><EditIcon /></IconButton>
                     </Tooltip>
                   )
                 )}

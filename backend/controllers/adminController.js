@@ -1,5 +1,6 @@
 const Conciliacion = require('../models/conciliacionModel');
 const Solicitud = require('../models/solicitudModel');
+const Liquidacion = require('../models/liquidacionModel');
 const Poder = require('../models/poderModel');
 const Contrato = require('../models/contratoModel');
 const User = require('../models/userModel');
@@ -12,7 +13,8 @@ const getStats = async (req, res) => {
   try {
     const totalSolicitudesInsolvencia = await Solicitud.countDocuments({});
     const totalSolicitudesConciliacion = await Conciliacion.countDocuments({});
-    const totalSolicitudes = totalSolicitudesInsolvencia + totalSolicitudesConciliacion;
+    const totalSolicitudesLiquidacion = await Liquidacion.countDocuments({});
+    const totalSolicitudes = totalSolicitudesInsolvencia + totalSolicitudesConciliacion + totalSolicitudesLiquidacion;
 
     const totalUsuarios = await User.countDocuments({});
     const totalAcreedores = await Acreedor.countDocuments({});
@@ -23,10 +25,13 @@ const getStats = async (req, res) => {
     const solicitudesPorTipoConciliacion = await Conciliacion.aggregate([
       { $group: { _id: '$tipoSolicitud', count: { $sum: 1 } } },
     ]);
+    const solicitudesPorTipoLiquidacion = await Liquidacion.aggregate([
+      { $group: { _id: '$tipoSolicitud', count: { $sum: 1 } } },
+    ]);
 
     // Merge solicitudesPorTipo results
     const solicitudesPorTipoMap = new Map();
-    [...solicitudesPorTipoInsolvencia, ...solicitudesPorTipoConciliacion].forEach(item => {
+    [...solicitudesPorTipoInsolvencia, ...solicitudesPorTipoConciliacion, ...solicitudesPorTipoLiquidacion].forEach(item => {
       solicitudesPorTipoMap.set(item._id, (solicitudesPorTipoMap.get(item._id) || 0) + item.count);
     });
     const solicitudesPorTipo = Array.from(solicitudesPorTipoMap, ([_id, count]) => ({ _id, count }))
@@ -45,10 +50,16 @@ const getStats = async (req, res) => {
             count: { $sum: 1 } 
         }},
     ]);
+    const solicitudesPorMesLiquidacion = await Liquidacion.aggregate([
+        { $group: { 
+            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, 
+            count: { $sum: 1 } 
+        }},
+    ]);
 
     // Merge solicitudesPorMes results
     const solicitudesPorMesMap = new Map();
-    [...solicitudesPorMesInsolvencia, ...solicitudesPorMesConciliacion].forEach(item => {
+    [...solicitudesPorMesInsolvencia, ...solicitudesPorMesConciliacion, ...solicitudesPorMesLiquidacion].forEach(item => {
       const key = `${item._id.year}-${item._id.month}`;
       const existing = solicitudesPorMesMap.get(key) || { _id: item._id, count: 0 };
       existing.count += item.count;
@@ -98,15 +109,17 @@ const getSolicitudes = async (req, res) => {
       : { createdAt: -1 };
 
     // Perform parallel queries
-    const [solicitudesInsolvencia, solicitudesConciliacion, countInsolvencia, countConciliacion] = await Promise.all([
+    const [solicitudesInsolvencia, solicitudesConciliacion, solicitudesLiquidacion, countInsolvencia, countConciliacion, countLiquidacion] = await Promise.all([
       Solicitud.find(query).populate('user', 'name email').populate('acreencias.acreedor').lean(),
       Conciliacion.find(query).populate('user', 'name email').lean(),
+      Liquidacion.find(query).populate('user', 'name email').lean(),
       Solicitud.countDocuments(query),
-      Conciliacion.countDocuments(query)
+      Conciliacion.countDocuments(query),
+      Liquidacion.countDocuments(query)
     ]);
     
     // Combine, sort, and paginate in memory
-    const combinedResults = [...solicitudesInsolvencia, ...solicitudesConciliacion];
+    const combinedResults = [...solicitudesInsolvencia, ...solicitudesConciliacion, ...solicitudesLiquidacion];
 
     // In-memory sort
     combinedResults.sort((a, b) => {
@@ -120,7 +133,7 @@ const getSolicitudes = async (req, res) => {
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
     
-    const totalRows = countInsolvencia + countConciliacion;
+    const totalRows = countInsolvencia + countConciliacion + countLiquidacion;
     const pageIndex = parseInt(page) - 1;
     const pageSize = parseInt(limit);
     const pagedResults = combinedResults.slice(
@@ -255,6 +268,8 @@ const uploadAnexo = async (req, res) => {
       DocumentModel = Solicitud;
     } else if (tipo === 'conciliacion') {
       DocumentModel = Conciliacion;
+    } else if (tipo === 'liquidacion') {
+      DocumentModel = Liquidacion;
     } else {
       return res.status(400).json({ message: 'Tipo de documento no válido.' });
     }

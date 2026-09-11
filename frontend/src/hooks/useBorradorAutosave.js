@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import borradorService, { TIPO_CONCILIACION, TIPO_PODER, TIPO_CONTRATO } from '../services/borradorService';
+import borradorService, { TIPO_CONCILIACION, TIPO_LIQUIDACION, TIPO_PODER, TIPO_CONTRATO } from '../services/borradorService';
 
 const localStorageKey = (tipoSolicitud) => {
   if (tipoSolicitud === TIPO_CONCILIACION) return 'systemlex_borrador_conciliacion';
+  if (tipoSolicitud === TIPO_LIQUIDACION) return 'systemlex_borrador_liquidacion';
   if (tipoSolicitud === TIPO_PODER) return 'systemlex_borrador_poder';
   if (tipoSolicitud === TIPO_CONTRATO) return 'systemlex_borrador_contrato';
   return 'systemlex_borrador_insolvencia';

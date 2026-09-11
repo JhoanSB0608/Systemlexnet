@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-export const API_BASE_URL = 'https://api.systemlex.com.co'
+// URL base de la API. En desarrollo apunta a localhost:3000; en producción se
+// sobreescribe con REACT_APP_BACKEND_URL.
+export const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
 
 const API_URL = `${API_BASE_URL}/api/users`;
 const AUTH_URL = `${API_BASE_URL}/api/auth`;

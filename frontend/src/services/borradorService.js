@@ -6,11 +6,13 @@ import { API_BASE_URL } from './userService'; // Assuming this is defined in use
 
 const INSOLVENCIA_API_URL = `${API_BASE_URL}/api/solicitudes`;
 const CONCILIACION_API_URL = `${API_BASE_URL}/api/conciliaciones`;
+const LIQUIDACION_API_URL = `${API_BASE_URL}/api/liquidaciones`;
 const PODER_API_URL = `${API_BASE_URL}/api/poder`;
 const CONTRATO_API_URL = `${API_BASE_URL}/api/contrato`;
 
 export const TIPO_INSOLVENCIA = 'Solicitud de Insolvencia Económica de Persona Natural No Comerciante';
 export const TIPO_CONCILIACION = 'Solicitud de Conciliación Unificada';
+export const TIPO_LIQUIDACION = 'Solicitud de Liquidación Patrimonial Directa de Persona Natural No Comerciante';
 export const TIPO_PODER = 'Poder';
 export const TIPO_CONTRATO = 'Contrato de Prestación de Servicios';
 
@@ -28,6 +30,7 @@ const getConfig = (options = {}) => {
 
 export const obtenerApiBaseDeTipo = (tipoSolicitud) => {
   if (tipoSolicitud === TIPO_CONCILIACION) return CONCILIACION_API_URL;
+  if (tipoSolicitud === TIPO_LIQUIDACION) return LIQUIDACION_API_URL;
   if (tipoSolicitud === TIPO_PODER) return PODER_API_URL;
   if (tipoSolicitud === TIPO_CONTRATO) return CONTRATO_API_URL;
   return INSOLVENCIA_API_URL;
@@ -55,6 +58,7 @@ export const actualizarBorrador = async (borradorId, payload) => {
     const endpoints = [
       `${INSOLVENCIA_API_URL}/borrador/${borradorId}`,
       `${CONCILIACION_API_URL}/borrador/${borradorId}`,
+      `${LIQUIDACION_API_URL}/borrador/${borradorId}`,
       `${PODER_API_URL}/borrador/${borradorId}`,
       `${CONTRATO_API_URL}/borrador/${borradorId}`,
     ];
@@ -101,18 +105,20 @@ export const eliminarBorrador = async (borradorId, tipoSolicitud) => {
   }
 };
 
-// Obtiene el historial del usuario (borradores + completadas, de ambos tipos).
+// Obtiene el historial del usuario (borradores + completadas, de los tipos disponibles).
 export const obtenerMiHistorial = async ({ estado } = {}) => {
   try {
     const config = getConfig();
     const query = estado ? `?estado=${estado}` : '';
-    const [insolvencias, conciliaciones] = await Promise.all([
+    const [insolvencias, conciliaciones, liquidaciones] = await Promise.all([
       axios.get(`${INSOLVENCIA_API_URL}${query}`, config),
       axios.get(`${CONCILIACION_API_URL}${query}`, config),
+      axios.get(`${LIQUIDACION_API_URL}${query}`, config),
     ]);
     const conTipo = [
       ...insolvencias.data.map((s) => ({ ...s, _tipoDocumento: 'insolvencia' })),
       ...conciliaciones.data.map((c) => ({ ...c, _tipoDocumento: 'conciliacion' })),
+      ...liquidaciones.data.map((l) => ({ ...l, _tipoDocumento: 'liquidacion' })),
     ];
     // Ordenar por última actualización (desc)
     return conTipo.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));

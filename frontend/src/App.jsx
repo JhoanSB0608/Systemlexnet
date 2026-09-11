@@ -18,6 +18,7 @@ import useIdleTimeout from './hooks/useIdleTimeout';
 import SessionTimeoutModal from './components/common/SessionTimeoutModal';
 import EditarInsolvenciaPage from './pages/EditarInsolvenciaPage';
 import EditarConciliacionPage from './pages/EditarConciliacionPage';
+import EditarLiquidacionPage from './pages/EditarLiquidacionPage';
 import ArchiverPage from './pages/ArchiverPage'; // New import
 import ArchivedRequestsListPage from './pages/ArchivedRequestsListPage';
 import PoderPage from './pages/PoderPage';
@@ -165,6 +166,7 @@ const AuthProvider = ({ children }) => {
           <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
           <Route path="/admin/editar-solicitud/:id" element={<PrivateRoute><EditarInsolvenciaPage /></PrivateRoute>} />
           <Route path="/admin/editar-conciliacion/:id" element={<PrivateRoute><EditarConciliacionPage /></PrivateRoute>} />
+          <Route path="/admin/editar-liquidacion/:id" element={<PrivateRoute><EditarLiquidacionPage /></PrivateRoute>} />
           <Route path="/admin/editar-poder/:id" element={<PrivateRoute><EditarPoderPage /></PrivateRoute>} />
           <Route path="/admin/editar-contrato/:id" element={<PrivateRoute><EditarContratoPage /></PrivateRoute>} />
           <Route path="/archiver-create" element={<PrivateRoute><ArchiverPage /></PrivateRoute>} />

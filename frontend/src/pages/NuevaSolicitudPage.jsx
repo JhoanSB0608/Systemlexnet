@@ -31,8 +31,10 @@ import {
 } from '@mui/icons-material';
 import InsolvenciaForm from '../components/forms/InsolvenciaForm';
 import ConciliacionUnificadaForm from '../components/forms/ConciliacionUnificadaForm';
+import LiquidacionForm from '../components/forms/LiquidacionForm';
 import { createSolicitud, updateSolicitud, downloadSolicitudDocument } from '../services/solicitudService';
 import { createConciliacion, updateConciliacion, downloadConciliacionDocument } from '../services/conciliacionService';
+import { createLiquidacion, updateLiquidacion, downloadLiquidacionDocument } from '../services/liquidacionService';
 import { toast } from 'react-toastify';
 import { handleAxiosError, showSuccess } from '../utils/alert';
 import SharedGlassCard from '../components/common/GlassCard';
@@ -59,13 +61,21 @@ const tiposDeSolicitud = [
     shortLabel: 'Conciliación',
     icon: '⚖️',
     color: '#4caf50',
+  },
+  {
+    value: 'Solicitud de Liquidación Patrimonial Directa de Persona Natural No Comerciante',
+    label: 'Liquidación Patrimonial',
+    shortLabel: 'Liquidación',
+    icon: '📋',
+    color: '#ff9800',
   }
 ];
 
 // Mapa para renderizar el formulario correcto
 const formComponentMap = {
   'Solicitud de Insolvencia Económica de Persona Natural No Comerciante': <InsolvenciaForm />,
-  'Solicitud de Conciliación Unificada': <ConciliacionUnificadaForm />
+  'Solicitud de Conciliación Unificada': <ConciliacionUnificadaForm />,
+  'Solicitud de Liquidación Patrimonial Directa de Persona Natural No Comerciante': <LiquidacionForm />
 };
 
 const NuevaSolicitudPage = () => {
@@ -99,6 +109,7 @@ const NuevaSolicitudPage = () => {
 
       let createdSolicitud;
       const esConciliacion = tipoSeleccionado === 'Solicitud de Conciliación Unificada';
+      const esLiquidacion = tipoSeleccionado === 'Solicitud de Liquidación Patrimonial Directa de Persona Natural No Comerciante';
 
       // Si el formulario trae _borradorId, fue un guardado parcial: actualizar el
       // documento existente marcándolo como completa (no duplicar).
@@ -110,6 +121,11 @@ const NuevaSolicitudPage = () => {
         createdSolicitud = borradorId
           ? await updateConciliacion(borradorId, { ...dataToSend, estado: 'completa' })
           : await createConciliacion(dataToSend);
+      } else if (esLiquidacion) {
+        const dataToSend = { ...data, tipoSolicitud: tipoSeleccionado };
+        createdSolicitud = borradorId
+          ? await updateLiquidacion(borradorId, { ...dataToSend, estado: 'completa' })
+          : await createLiquidacion(dataToSend);
       } else {
         const dataToSend = { ...data, tipoSolicitud: tipoSeleccionado };
         createdSolicitud = borradorId
@@ -135,7 +151,18 @@ const NuevaSolicitudPage = () => {
     const toastId = toast.loading(`Descargando documento ${format.toUpperCase()}, por favor espere...`);
 
     try {
-      if (tipoSeleccionado === 'Solicitud de Conciliación Unificada') {
+      // La Solicitud de Liquidación solo se genera en PDF.
+      if (tipoSeleccionado === 'Solicitud de Liquidación Patrimonial Directa de Persona Natural No Comerciante') {
+        if (format !== 'pdf') {
+          toast.dismiss(toastId);
+          toast.info('El documento de Liquidación solo está disponible en formato PDF.');
+          setTimeout(() => {
+            setIsDownloading(prev => ({ ...prev, [format]: false }));
+          }, 1000);
+          return;
+        }
+        await downloadLiquidacionDocument(createdSolicitudId, format);
+      } else if (tipoSeleccionado === 'Solicitud de Conciliación Unificada') {
         await downloadConciliacionDocument(createdSolicitudId, format);
       } else {
         await downloadSolicitudDocument(createdSolicitudId, format);

@@ -19,6 +19,7 @@ const authRoutes = require("./routes/authRoutes");
 const archiverRoutes = require("./routes/archiverRoutes");
 const poderRoutes = require("./routes/poderRoutes");
 const contratoRoutes = require("./routes/contratoRoutes");
+const liquidacionRoutes = require("./routes/liquidacionRoutes");
 const path = require("path");
 
 // Passport config
@@ -95,6 +96,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/archiver", archiverRoutes);
 app.use("/api/poder", poderRoutes);
 app.use("/api/contrato", contratoRoutes);
+app.use("/api/liquidaciones", liquidacionRoutes);
 
 //
 // =============================
