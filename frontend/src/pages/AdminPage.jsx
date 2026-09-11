@@ -2305,9 +2305,6 @@ const AdminPage = () => {
                     <Tooltip title="Descargar PDF">
                       <IconButton onClick={() => handleDownload(original._id, original.tipoSolicitud, 'pdf')}><PictureAsPdf /></IconButton>
                     </Tooltip>
-                    <Tooltip title="Descargar DOCX">
-                      <IconButton onClick={() => handleDownload(original._id, original.tipoSolicitud, 'docx')}><DescriptionIcon /></IconButton>
-                    </Tooltip>
                   </>
                 )}
             </Stack>
