@@ -185,6 +185,17 @@ function procesoBloque(proceso = {}, index) {
   };
 }
 
+// Pruebas por defecto de la sección VII. PRUEBAS (cuando el formulario no
+// guarda ninguna selección de pruebas).
+const PRUEBAS_DEFAULT = [
+  'Copia de la cédula de ciudadanía del solicitante.',
+  'Poder conferido al apoderado judicial.',
+  'Anexo No. 1: Relación completa y actualizada de acreencias.',
+  'Desprendible de Nomina',
+  'Documentos relacionados con sociedad conyugal.',
+  'Certificado REDAM, si resulta aplicable por la existencia o inexistencia de obligaciones alimentarias.',
+];
+
 // -------------------- Definición del documento --------------------
 function buildLiquidacionDocDefinition(solicitud = {}) {
   const normalized = (solicitud && typeof solicitud.toObject === 'function') ? solicitud.toObject() : solicitud;
@@ -196,6 +207,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     procesosJudiciales = [],
     informacionFinanciera = {},
     entidadesFinancieras = [],
+    pruebas = [],
     firma = {},
     anexos = [],
   } = normalized;
@@ -637,15 +649,11 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
   // ============ VII. PRUEBAS ============
   c.push(tituloSeccion('VII. PRUEBAS'));
   c.push(parrafo('Solicito que se tengan como pruebas los siguientes documentos:'));
-  const pruebas = [
-    `Copia de la cédula de ciudadanía del solicitante.`,
-    'Poder conferido al apoderado judicial.',
-    'Anexo No. 1: Relación completa y actualizada de acreencias.',
-    'Desprendible de Nomina',
-    'Documentos relacionados con sociedad conyugal.',
-    'Certificado REDAM, si resulta aplicable por la existencia o inexistencia de obligaciones alimentarias.',
-  ];
-  pruebas.forEach((p, i) => c.push(parrafo(`${i + 1}. ${p}`, { margin: [12, 4, 0, 4] })));
+  const pruebasSeleccionadas = (pruebas || [])
+    .map((p) => safe(p).trim())
+    .filter(Boolean);
+  const pruebasList = pruebasSeleccionadas.length ? pruebasSeleccionadas : PRUEBAS_DEFAULT;
+  pruebasList.forEach((p, i) => c.push(parrafo(`${i + 1}. ${p}`, { margin: [12, 4, 0, 4] })));
 
   c.push(saltoDeLinea);
 

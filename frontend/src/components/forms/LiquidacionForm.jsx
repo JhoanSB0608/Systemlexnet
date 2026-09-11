@@ -36,6 +36,17 @@ import { useBorradorAutosave } from '../../hooks/useBorradorAutosave';
 import borradorService, { TIPO_LIQUIDACION } from '../../services/borradorService';
 import GlassCard from '../common/GlassCard';
 
+// Pruebas predeterminadas de la sección "Pruebas". El usuario puede marcarlas o
+// desmarcarlas y crear pruebas personalizadas; el documento lista la selección.
+const PRUEBAS_PREDETERMINADAS = [
+  'Copia de la cédula de ciudadanía del solicitante.',
+  'Poder conferido al apoderado judicial.',
+  'Anexo No. 1: Relación completa y actualizada de acreencias.',
+  'Desprendible de Nomina',
+  'Documentos relacionados con sociedad conyugal.',
+  'Certificado REDAM, si resulta aplicable por la existencia o inexistencia de obligaciones alimentarias.',
+];
+
 // --- Reusable Glassmorphism Components ---
 
 const GlassTextField = React.forwardRef(({ error, helperText, ...props }, ref) => {
@@ -225,6 +236,7 @@ const buildFormattedData = (initialData) => ({
     valor: p.valor ?? '',
   })),
   entidadesFinancieras: initialData.entidadesFinancieras || [],
+  pruebas: initialData.pruebas?.length ? initialData.pruebas : [...PRUEBAS_PREDETERMINADAS],
   informacionFinanciera: initialData.informacionFinanciera || {},
   anexos: initialData.anexos?.map((a) => ({
     ...a,
@@ -249,6 +261,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       acreencias: [],
       procesosJudiciales: [],
       entidadesFinancieras: [],
+      pruebas: [...PRUEBAS_PREDETERMINADAS],
       informacionFinanciera: {
         cuantiaTotal: '', numeroObligaciones: '', numeroAcreedores: '', porcentajePasivo: '',
         ingresosMensuales: '', entidadEmpleadora: '', cargoEmpleo: '', gastosMensuales: '',
@@ -263,6 +276,33 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const { fields: procesosFields, append: appendProceso, remove: removeProceso } = useFieldArray({ control, name: 'procesosJudiciales' });
   const { fields: entidadesFields, append: appendEntidad, remove: removeEntidad } = useFieldArray({ control, name: 'entidadesFinancieras' });
   const { fields: anexosFields, append: appendAnexo, remove: removeAnexo } = useFieldArray({ control, name: 'anexos' });
+
+  const pruebasSeleccionadas = watch('pruebas') || [];
+  const pruebasPersonalizadas = pruebasSeleccionadas.filter((p) => !PRUEBAS_PREDETERMINADAS.includes(p));
+  const [nuevaPrueba, setNuevaPrueba] = useState('');
+
+  const togglePrueba = (texto) => {
+    const actuales = new Set(pruebasSeleccionadas);
+    if (actuales.has(texto)) actuales.delete(texto); else actuales.add(texto);
+    const ordenadas = [
+      ...PRUEBAS_PREDETERMINADAS.filter((t) => actuales.has(t)),
+      ...pruebasPersonalizadas.filter((t) => actuales.has(t)),
+    ];
+    setValue('pruebas', ordenadas);
+  };
+
+  const agregarPrueba = () => {
+    const texto = nuevaPrueba.trim();
+    if (!texto) return;
+    if (!pruebasSeleccionadas.includes(texto)) {
+      setValue('pruebas', [...pruebasSeleccionadas, texto]);
+    }
+    setNuevaPrueba('');
+  };
+
+  const quitarPrueba = (texto) => {
+    setValue('pruebas', pruebasSeleccionadas.filter((p) => p !== texto));
+  };
 
   const [tabValue, setTabValue] = useState(0);
   const [validationError, setValidationError] = useState('');
@@ -536,6 +576,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
     const dataToSend = {
       ...data,
+      pruebas: (data.pruebas || []).map((p) => (p || '').trim()).filter(Boolean),
       anexos: (data.anexos || []).map(anexo => ({
         ...anexo,
         name: anexo.url ? anexo.name : (anexo.descripcion ? ' ' : anexo.name),
@@ -554,11 +595,11 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     // Process Signature File
     if (signatureSource === 'upload' && dataToSend.firma?.file instanceof File) {
       try {
-        const gcsUrl = await uploadFile(dataToSend.firma.file);
+        const { fileUrl, uniqueFilename } = await uploadFile(dataToSend.firma.file);
         dataToSend.firma = {
           source: 'upload',
-          name: dataToSend.firma.file.name,
-          url: gcsUrl,
+          name: uniqueFilename || dataToSend.firma.file.name,
+          url: fileUrl,
         };
       } catch (error) {
         console.error('Error uploading signature:', error);
@@ -634,7 +675,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     { key: 'procesosJudiciales', label: 'Procesos', icon: AccountBalanceIcon, color: '#f44336' },
     { key: 'entidadesFinancieras', label: 'Centrales de Riesgo', icon: BusinessIcon, color: '#9c27b0' },
     { key: 'informacionFinanciera', label: 'Financiera', icon: TrendingUpIcon, color: '#4caf50' },
-    { key: 'anexos', label: 'Anexos', icon: AttachFileIcon, color: '#009688' },
+    { key: 'anexos', label: 'Pruebas', icon: AttachFileIcon, color: '#009688' },
     { key: 'firma', label: 'Firma', icon: CreateIcon, color: '#795548' },
   ];
 
@@ -1011,7 +1052,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
               </GlassCard>
             ))}
             <Button variant="outlined" onClick={() => appendProceso({})} startIcon={<AddIcon />}>Añadir Proceso Judicial</Button>
-            <Button variant="contained" onClick={() => handleSaveSection('procesosJudiciales', 6)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+            <Button variant="contained" onClick={() => handleSaveSection('procesosJudiciales', 5)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
               {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
             </Button>
           </Stack>
@@ -1074,7 +1115,55 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         <TabPanel value={tabValue} index={7}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={2}>
-              <Typography variant="h6">Pruebas y Anexos</Typography>
+              <Typography variant="h6">Pruebas</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Seleccione las pruebas a relacionar en el documento (las predeterminadas vienen marcadas) y/o cree pruebas adicionales.
+              </Typography>
+              {PRUEBAS_PREDETERMINADAS.map((texto) => (
+                <FormControlLabel
+                  key={texto}
+                  control={
+                    <Checkbox
+                      checked={pruebasSeleccionadas.includes(texto)}
+                      onChange={() => togglePrueba(texto)}
+                    />
+                  }
+                  label={texto}
+                />
+              ))}
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                <GlassTextField
+                  value={nuevaPrueba}
+                  onChange={(e) => setNuevaPrueba(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregarPrueba(); } }}
+                  label="Nueva prueba"
+                  placeholder="Describa la prueba personalizada"
+                  fullWidth
+                />
+                <Button variant="outlined" onClick={agregarPrueba} startIcon={<AddIcon />} sx={{ whiteSpace: 'nowrap' }}>
+                  Agregar
+                </Button>
+              </Stack>
+              {pruebasPersonalizadas.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                  {pruebasPersonalizadas.map((texto) => (
+                    <Chip
+                      key={texto}
+                      label={texto}
+                      color="primary"
+                      variant="outlined"
+                      onDelete={() => quitarPrueba(texto)}
+                      deleteIcon={<CloseIcon />}
+                    />
+                  ))}
+                </Box>
+              )}
+            </Stack>
+          </GlassCard>
+
+          <GlassCard sx={{ p: 3, mt: 3 }}>
+            <Stack spacing={2}>
+              <Typography variant="h6">Anexos / Archivos Adjuntos</Typography>
               {anexosFields.map((field, index) => {
                 const isUploadingAnexo = uploadingAnexos[index];
                 return (

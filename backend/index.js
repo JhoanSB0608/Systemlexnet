@@ -20,6 +20,7 @@ const archiverRoutes = require("./routes/archiverRoutes");
 const poderRoutes = require("./routes/poderRoutes");
 const contratoRoutes = require("./routes/contratoRoutes");
 const liquidacionRoutes = require("./routes/liquidacionRoutes");
+const fileRoutes = require("./routes/fileRoutes");
 const path = require("path");
 
 // Passport config
@@ -74,6 +75,7 @@ app.use(express.json({ limit: '10mb' }));
 //  Esto es lo que permite que el logo cargue en los correos
 //
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Inicializar Passport
 app.use(passport.initialize());
@@ -97,6 +99,7 @@ app.use("/api/archiver", archiverRoutes);
 app.use("/api/poder", poderRoutes);
 app.use("/api/contrato", contratoRoutes);
 app.use("/api/liquidaciones", liquidacionRoutes);
+app.use("/api/files", fileRoutes);
 
 //
 // =============================

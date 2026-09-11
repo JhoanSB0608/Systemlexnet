@@ -636,11 +636,11 @@ const ConciliacionUnificadaForm = ({ onSubmit, resetToken, initialData, isUpdati
     // Process Signature File
     if (signatureSource === 'upload' && dataToSend.firma?.file instanceof File) {
         try {
-            const gcsUrl = await uploadFile(dataToSend.firma.file);
+            const { fileUrl, uniqueFilename } = await uploadFile(dataToSend.firma.file);
             dataToSend.firma = {
                 source: 'upload',
-                name: dataToSend.firma.file.name,
-                url: gcsUrl,
+                name: uniqueFilename || dataToSend.firma.file.name,
+                url: fileUrl,
             };
         } catch (error) {
             console.error("Error uploading signature:", error);

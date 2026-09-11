@@ -883,17 +883,14 @@ const AnexosSection = ({ anexos, solicitudId, tipoSolicitud, onUploadSuccess }) 
   };
 
   const handleDownload = async (anexo) => {
-    if (!anexo.url) {
+    if (!anexo.url && !anexo.name) {
         toast.info("Este anexo es solo una nota de texto. No se cargo un archivo previamente.");
         return;
     }
-    if (!anexo.name) {
-        toast.error("Nombre del archivo no encontrado.");
-        return;
-    }
     try {
-      await downloadFile(anexo.name);
-      toast.success(`Iniciando descarga de ${anexo.name}...`);
+      const downloadTarget = anexo.url || anexo.name;
+      await downloadFile(downloadTarget);
+      toast.success(`Iniciando descarga de ${anexo.name || 'archivo'}...`);
     } catch (error) {
       toast.error(`Error al descargar el archivo: ${error.message}`);
     }

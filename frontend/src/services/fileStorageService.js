@@ -1,6 +1,37 @@
-
 const API_URL = process.env.REACT_APP_GCS_API_URL || process.env.REACT_APP_BACKEND_URL || 'https://gcs-signed-urls-20536909632.us-central1.run.app';
-console.log("fileStorageService API_URL:", API_URL);
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+console.log("fileStorageService API_URL:", API_URL, "| BACKEND_URL:", BACKEND_URL);
+
+const getToken = () => {
+  if (typeof window === 'undefined') return null;
+  const userInfo = window.localStorage.getItem('userInfo');
+  return userInfo ? JSON.parse(userInfo).token : null;
+};
+
+/**
+ * Sube el archivo usando el backend como respaldo (multer) cuando el servicio
+ * de firmas de GCS no está disponible.
+ * @param {File} file
+ * @returns {Promise<{fileUrl: string, uniqueFilename: string}>}
+ */
+const uploadFileToBackend = async (file) => {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getToken();
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(`${BACKEND_URL}/api/files/upload`, {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to upload file to backend: ${response.statusText}`);
+  }
+  return response.json();
+};
 
 /**
  * Requests a signed URL from the backend for uploading a file to GCS,
@@ -58,47 +89,50 @@ export const uploadFile = async (file) => {
     console.log(`[uploadFile] File uploaded successfully to: ${fileUrl}`);
     return { fileUrl, uniqueFilename: file.name }; // Return both the URL and the original filename
   } catch (error) {
-    console.error('Error in uploadFile:', error);
-    throw error;
+    console.warn('[uploadFile] GCS no disponible, intentando respaldo local en backend:', error.message);
+    try {
+      const result = await uploadFileToBackend(file);
+      console.log(`[uploadFile] Archivo subido al respaldo local: ${result.fileUrl}`);
+      return result;
+    } catch (fallbackError) {
+      console.error('[uploadFile] Respaldo local también falló:', fallbackError);
+      throw new Error(`Error al subir el archivo: ${fallbackError.message}`);
+    }
   }
 };
 
 /**
- * Requests a signed URL from the backend for downloading a file from GCS,
- * then opens the URL in a new browser tab to initiate download.
- * @param {string} filename The name of the file to download.
+ * Descarga un archivo. Acepta una URL absoluta (GCS), una URL relativa del
+ * backend (/uploads/...) o un nombre de archivo (legacy).
+ * @param {string} filenameOrUrl El nombre o URL del archivo a descargar.
  */
-export const downloadFile = async (filename) => {
-  if (!API_URL) {
-    throw new Error("REACT_APP_GCS_API_URL / REACT_APP_BACKEND_URL is not defined.");
-  }
-  const requestUrl = `${API_URL}/api/gcs/download-url?filename=${encodeURIComponent(filename)}`;
-  console.log(`[downloadFile] Requesting signed URL for filename: "${filename}" from URL: ${requestUrl}`);
+export const downloadFile = async (filenameOrUrl) => {
+  let url;
 
-  try {
-    // 1. Request a signed URL from the backend for download
-    const response = await fetch(requestUrl, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('[downloadFile] Failed to get signed URL:', errorData);
-      throw new Error(`Failed to get signed URL for download: ${errorData.message || response.statusText}`);
+  if (/^https?:\/\//i.test(filenameOrUrl)) {
+    url = filenameOrUrl;
+  } else if (filenameOrUrl.startsWith('/')) {
+    url = `${BACKEND_URL}${filenameOrUrl}`;
+  } else {
+    // Legacy: nombre de archivo en GCS.
+    try {
+      const requestUrl = `${API_URL}/api/gcs/download-url?filename=${encodeURIComponent(filenameOrUrl)}`;
+      console.log(`[downloadFile] Requesting signed URL for filename: "${filenameOrUrl}" from URL: ${requestUrl}`);
+      const response = await fetch(requestUrl, { method: 'GET' });
+      if (!response.ok) {
+        throw new Error(`Failed to get signed URL for download: ${response.statusText}`);
+      }
+      const { signedUrl } = await response.json();
+      if (!signedUrl) {
+        throw new Error("Signed URL for download not received from backend.");
+      }
+      url = signedUrl;
+    } catch (error) {
+      console.warn('[downloadFile] GCS no disponible, intentando archivo local:', error.message);
+      url = `${BACKEND_URL}/uploads/${encodeURIComponent(filenameOrUrl)}`;
     }
-
-    const { signedUrl } = await response.json();
-    console.log('[downloadFile] Received signed URL:', signedUrl);
-
-    if (!signedUrl) {
-      throw new Error("Signed URL for download not received from backend.");
-    }
-
-    // 2. Open the signed URL in a new tab to initiate download
-    window.open(signedUrl, '_blank');
-    console.log(`[downloadFile] Initiated download for file: ${filename}`);
-  } catch (error) {
-    console.error('Error in downloadFile:', error);
-    throw error;
   }
+
+  console.log(`[downloadFile] Initiating download for: ${url}`);
+  window.open(url, '_blank');
 };

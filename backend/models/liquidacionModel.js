@@ -110,6 +110,7 @@ const liquidacionSchema = new mongoose.Schema(
     procesosJudiciales: [procesoSchema],
     informacionFinanciera: infoFinancieraSchema,
     entidadesFinancieras: [entidadFinancieraSchema],
+    pruebas: [String],
     anexos: [anexoSchema],
     firma: firmaSchema,
   },
