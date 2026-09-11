@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { generateLiquidacionPdf } = require('../utils/LiquidacionDocumentGenerator');
+const { generateLiquidacionAnexosPdf } = require('../utils/AnexosLiquidacionDocumentGenerator');
 
 const TIPO_LIQUIDACION = 'Solicitud de Liquidación Patrimonial Directa de Persona Natural No Comerciante';
 
@@ -16,6 +17,24 @@ const buildDeudorNombreCompleto = (deudor) => {
   ].filter(Boolean).join(' ');
 };
 
+// El formulario envía el acreedor completo (objeto del listado); el modelo solo
+// persiste la referencia (ObjectId). Aquí se normaliza y se conserva el nombre
+// denormalizado para el documento sin necesidad de hacer populate siempre.
+const normalizeAcreedores = (data) => {
+  if (!data || !Array.isArray(data.acreencias)) return data;
+  data.acreencias = data.acreencias.map((a) => {
+    const acreencia = { ...a };
+    const ac = acreencia.acreedor;
+    if (ac && typeof ac === 'object' && !Array.isArray(ac) && ac._id) {
+      acreencia.nombreAcreedor = ac.nombre || acreencia.nombreAcreedor;
+      acreencia.tipoAcreedor = ac.tipoDoc || acreencia.tipoAcreedor;
+      acreencia.acreedor = ac._id;
+    }
+    return acreencia;
+  });
+  return data;
+};
+
 const createLiquidacion = async (req, res) => {
   console.log('[liquidacionController] createLiquidacion - received body:', JSON.stringify(req.body, null, 2));
   try {
@@ -27,6 +46,7 @@ const createLiquidacion = async (req, res) => {
     }
 
     buildDeudorNombreCompleto(dataToSave.deudor);
+    normalizeAcreedores(dataToSave);
 
     const liquidacion = new Liquidacion(dataToSave);
     const createdLiquidacion = await liquidacion.save();
@@ -43,7 +63,7 @@ const createLiquidacion = async (req, res) => {
 
 const getLiquidacionDocumento = async (req, res) => {
   try {
-    const liquidacion = await Liquidacion.findById(req.params.id).populate('user');
+    const liquidacion = await Liquidacion.findById(req.params.id).populate('user').populate('acreencias.acreedor');
 
     if (!liquidacion) {
       return res.status(404).json({ message: 'Solicitud de liquidación no encontrada' });
@@ -106,6 +126,30 @@ const getLiquidacionDocumento = async (req, res) => {
   }
 };
 
+const getLiquidacionAnexos = async (req, res) => {
+  try {
+    const liquidacion = await Liquidacion.findById(req.params.id).populate('user').populate('acreencias.acreedor');
+
+    if (!liquidacion) {
+      return res.status(404).json({ message: 'Solicitud de liquidación no encontrada' });
+    }
+
+    if (!liquidacion.user || (liquidacion.user._id.toString() !== req.user._id.toString() && !req.user.isAdmin)) {
+      return res.status(401).json({ message: 'No autorizado para ver este documento' });
+    }
+
+    const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const buffer = await generateLiquidacionAnexosPdf(liquidacion, baseUrl);
+    const filename = `anexos-liquidacion-${liquidacion._id}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.send(buffer);
+  } catch (error) {
+    console.error('Error al generar los anexos de liquidación:', error);
+    res.status(500).json({ message: 'Error en el servidor al generar los anexos.', error: error.message });
+  }
+};
+
 const getLiquidacionById = async (req, res) => {
   try {
     const liquidacion = await Liquidacion.findById(req.params.id).populate('user', 'name email');
@@ -150,6 +194,7 @@ const updateLiquidacion = async (req, res) => {
     delete dataToUpdate.seccionesGuardadas;
 
     buildDeudorNombreCompleto(dataToUpdate.deudor);
+    normalizeAcreedores(dataToUpdate);
     liquidacion.set(dataToUpdate);
 
     if ('anexos' in dataToUpdate) {
@@ -157,6 +202,15 @@ const updateLiquidacion = async (req, res) => {
     }
     if ('firma' in dataToUpdate) {
       liquidacion.firma = dataToUpdate.firma;
+    }
+    if ('firmaDeudor' in dataToUpdate) {
+      liquidacion.firmaDeudor = dataToUpdate.firmaDeudor;
+    }
+    if ('bienesInventarioImagen' in dataToUpdate) {
+      liquidacion.bienesInventarioImagen = dataToUpdate.bienesInventarioImagen;
+    }
+    if ('certificacionLaboralImagen' in dataToUpdate) {
+      liquidacion.certificacionLaboralImagen = dataToUpdate.certificacionLaboralImagen;
     }
 
     const updatedLiquidacion = await liquidacion.save();
@@ -207,10 +261,14 @@ const saveBorrador = async (req, res) => {
     delete data.estado;
 
     buildDeudorNombreCompleto(data.deudor);
+    normalizeAcreedores(data);
     borrador.set(data);
 
     if ('anexos' in data) borrador.anexos = data.anexos || [];
     if ('firma' in data) borrador.firma = data.firma;
+    if ('firmaDeudor' in data) borrador.firmaDeudor = data.firmaDeudor;
+    if ('bienesInventarioImagen' in data) borrador.bienesInventarioImagen = data.bienesInventarioImagen;
+    if ('certificacionLaboralImagen' in data) borrador.certificacionLaboralImagen = data.certificacionLaboralImagen;
     if ('seccionesGuardadas' in data) borrador.seccionesGuardadas = data.seccionesGuardadas;
 
     const saved = await borrador.save();
@@ -244,10 +302,14 @@ const updateBorrador = async (req, res) => {
     delete data.estado;
 
     buildDeudorNombreCompleto(data.deudor);
+    normalizeAcreedores(data);
     borrador.set(data);
 
     if ('anexos' in data) borrador.anexos = data.anexos || [];
     if ('firma' in data) borrador.firma = data.firma;
+    if ('firmaDeudor' in data) borrador.firmaDeudor = data.firmaDeudor;
+    if ('bienesInventarioImagen' in data) borrador.bienesInventarioImagen = data.bienesInventarioImagen;
+    if ('certificacionLaboralImagen' in data) borrador.certificacionLaboralImagen = data.certificacionLaboralImagen;
     if ('seccionesGuardadas' in data) borrador.seccionesGuardadas = data.seccionesGuardadas;
 
     const saved = await borrador.save();
@@ -282,6 +344,7 @@ const deleteBorrador = async (req, res) => {
 module.exports = {
   createLiquidacion,
   getLiquidacionDocumento,
+  getLiquidacionAnexos,
   getLiquidacionById,
   updateLiquidacion,
   getMisLiquidaciones,

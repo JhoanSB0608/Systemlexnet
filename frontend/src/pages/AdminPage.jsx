@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { getAdminStats, getAdminSolicitudes, getAdminPoderes, getAdminContratos, uploadAnexo } from '../services/adminService';
 import { downloadSolicitudDocument } from '../services/solicitudService';
 import { downloadConciliacionDocument } from '../services/conciliacionService';
-import { downloadLiquidacionDocument } from '../services/liquidacionService';
+import { downloadLiquidacionDocument, downloadLiquidacionAnexos } from '../services/liquidacionService';
 import { downloadPoderDocument } from '../services/poderService';
 import { downloadContratoDocument } from '../services/contratoService';
 import { downloadFile, uploadFile as fileStorageServiceUploadFile } from '../services/fileStorageService';
@@ -35,7 +35,8 @@ import {
     Dashboard as DashboardIcon, History as HistoryIcon, Group as GroupIcon,
     Search, FilterList, Refresh, Analytics, Timeline, Edit as EditIcon, ExpandMore as ExpandMoreIcon,
     Close as CloseIcon, CloudUpload as CloudUploadIcon, Download as DownloadIcon, KeyboardArrowDown, KeyboardArrowUp, Person, Folder, Handshake, Gavel, Balance, AttachMoney, FamilyRestroom, FoodBank, HomeWork, DirectionsCar, FactCheck,
-    LocalHospital, School, Receipt, Shield, Home, Business, Security, ShoppingCart, SportsEsports, Wc, Event, Today
+    LocalHospital, School, Receipt, Shield, Home, Business, Security, ShoppingCart, SportsEsports, Wc, Event, Today,
+    Article as ArticleIcon
 } from '@mui/icons-material';
 // --- Enhanced Dashboard Components ---
 
@@ -1958,6 +1959,22 @@ const AdminPage = () => {
     }
   };
 
+  const handleDownloadAnexosLiquidacion = async (solicitudId) => {
+    const toastId = toast.loading('Generando Anexos de Liquidación, por favor espere...');
+    try {
+      await downloadLiquidacionAnexos(solicitudId);
+      toast.update(toastId, {
+        render: "¡Anexos Descargados!",
+        type: "success",
+        isLoading: false,
+        autoClose: 5000
+      });
+    } catch (error) {
+      toast.dismiss(toastId);
+      handleAxiosError(error, 'Error al descargar los Anexos de Liquidación.');
+    }
+  };
+
   const handleDownloadPoder = async (poderId) => {
     const toastId = toast.loading('Descargando documento del Poder, por favor espere...');
     try {
@@ -2302,6 +2319,13 @@ const AdminPage = () => {
                 )}
                 {!isDraft && (
                   <>
+                    {original.tipoSolicitud.startsWith('Solicitud de Liquidación') && (
+                      <Tooltip title="Descargar Anexos de Liquidación">
+                        <IconButton onClick={() => handleDownloadAnexosLiquidacion(original._id)} sx={{ color: theme.palette.warning.main }}>
+                          <ArticleIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title="Descargar PDF">
                       <IconButton onClick={() => handleDownload(original._id, original.tipoSolicitud, 'pdf')}><PictureAsPdf /></IconButton>
                     </Tooltip>

@@ -52,12 +52,32 @@ const apoderadoSchema = new mongoose.Schema({
   telefono: { type: String },
 });
 
+// Esquema replicado del de insolvencia (solicitudModel.js) con la información
+// de mora persistida, ya que en la liquidación las "obligaciones" se derivan de
+// las acreencias marcadas con ¿crédito en mora? y ¿mora por más de 90 días?.
 const acreenciaSchema = new mongoose.Schema({
   acreedor: { type: mongoose.Schema.Types.ObjectId, ref: 'Acreedor' },
   nombreAcreedor: { type: String },
   tipoAcreedor: { type: String },
+  tipoAcreencia: { type: String },
+  otroTipoAcreencia: { type: String },
+  naturalezaCredito: { type: String },
   naturaleza: { type: String },
+  descripcionCredito: { type: String },
   capital: { type: Number, default: 0 },
+  valorTotalInteresCorriente: { type: Number, default: 0 },
+  tasaInteresCorriente: { type: String },
+  tipoInteresCorriente: { type: String },
+  pagoPorLibranza: { type: Boolean, default: false },
+  creditoPostergado: { type: Boolean, default: false },
+  creditoEnMora: { type: Boolean, default: false },
+  moraMas90Dias: { type: Boolean, default: false },
+  diasDeMora: { type: Number },
+  valorTotalInteresMoratorio: { type: Number, default: 0 },
+  tasaInteresMoratorio: { type: String },
+  tipoInteresMoratorio: { type: String },
+  fechaOtorgamiento: { type: Date },
+  fechaVencimiento: { type: Date },
 });
 
 const procesoSchema = new mongoose.Schema({
@@ -113,6 +133,9 @@ const liquidacionSchema = new mongoose.Schema(
     pruebas: [String],
     anexos: [anexoSchema],
     firma: firmaSchema,
+    firmaDeudor: firmaSchema,
+    bienesInventarioImagen: anexoSchema,
+    certificacionLaboralImagen: anexoSchema,
   },
   { timestamps: true }
 );

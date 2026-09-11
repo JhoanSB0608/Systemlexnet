@@ -2,9 +2,10 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import {
   TextField, Button, Typography, Box, Grid, Tabs, Tab, Checkbox,
-  FormControlLabel, FormControl, InputLabel, Select, MenuItem, FormHelperText,
+  FormControlLabel, Tooltip, FormControl, InputLabel, Select, MenuItem, FormHelperText,
   alpha, useTheme, Stack, Avatar, IconButton, Chip, LinearProgress, Collapse,
-  Alert, Badge, RadioGroup, Radio, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, CircularProgress
+  Alert, Badge, RadioGroup, Radio, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, CircularProgress,
+  Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow
 } from '@mui/material';
 import {
   LocationCity as LocationCityIcon,
@@ -26,11 +27,18 @@ import {
   CloudDone as CloudDoneIcon,
   CloudUpload as CloudUploadIcon,
   AccountBalanceWallet as AccountBalanceWalletIcon,
-  Business as BusinessIcon
+  Business as BusinessIcon,
+  Warning as WarningIcon,
+  Verified as VerifiedIcon,
+  Info as InfoIcon,
+  AttachMoney as AttachMoneyIcon
 } from '@mui/icons-material';
+import ReactSelect from "react-select";
+import { useQuery } from '@tanstack/react-query';
 import SignatureCanvas from 'react-signature-canvas';
 import LocationSelector from './LocationSelector';
 import { uploadFile } from '../../services/fileStorageService';
+import { getAcreedores } from '../../services/acreedorService';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useBorradorAutosave } from '../../hooks/useBorradorAutosave';
 import borradorService, { TIPO_LIQUIDACION } from '../../services/borradorService';
@@ -76,42 +84,6 @@ const GlassTextField = React.forwardRef(({ error, helperText, ...props }, ref) =
     />
   );
 });
-
-const GlassSelect = ({ control, name, label, options, rules, error, ...props }) => {
-    const theme = useTheme();
-    return (
-        <FormControl fullWidth error={!!error}>
-            <InputLabel>{label}</InputLabel>
-            <Controller
-                name={name}
-                control={control}
-                rules={rules}
-                defaultValue=""
-                render={({ field }) => (
-                    <Select
-                        {...field}
-                        label={label}
-                        sx={{
-                            minWidth: 300,
-                            borderRadius: '12px',
-                            background: 'rgba(255, 255, 255, 0.08)',
-                            backdropFilter: 'blur(10px)',
-                            '.MuiOutlinedInput-notchedOutline': { border: '1px solid rgba(255, 255, 255, 0.2)' },
-                            '&:hover .MuiOutlinedInput-notchedOutline': { border: '1px solid rgba(255, 255, 255, 0.3)' },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: `2px solid ${error ? theme.palette.error.main : alpha(theme.palette.primary.main, 0.5)} !important` },
-                        }}
-                        {...props}
-                    >
-                        {options.map(option => (
-                            <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
-                        ))}
-                    </Select>
-                )}
-            />
-            {error && <FormHelperText>{error.message}</FormHelperText>}
-        </FormControl>
-    );
-};
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -230,6 +202,10 @@ const buildFormattedData = (initialData) => ({
   acreencias: initialData.acreencias?.map((a) => ({
     ...a,
     capital: a.capital ?? '',
+    creditoEnMora: !!a.creditoEnMora,
+    moraMas90Dias: !!a.moraMas90Dias,
+    pagoPorLibranza: !!a.pagoPorLibranza,
+    creditoPostergado: !!a.creditoPostergado,
   })),
   procesosJudiciales: initialData.procesosJudiciales?.map((p) => ({
     ...p,
@@ -244,11 +220,62 @@ const buildFormattedData = (initialData) => ({
     url: a.url,
     file: undefined,
   })),
+  firmaDeudor: initialData.firmaDeudor || { source: 'draw', data: null, file: null },
+  bienesInventarioImagen: initialData.bienesInventarioImagen || { name: '', url: '', descripcion: '' },
+  certificacionLaboralImagen: initialData.certificacionLaboralImagen || { name: '', url: '', descripcion: '' },
 });
 
 const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const theme = useTheme();
-  const { register, control, handleSubmit, watch, setValue, getValues, trigger, formState: { errors }, reset, setError } = useForm({
+  const selectSx = {
+    minWidth: 250,
+    width: '100%',
+    borderRadius: '12px',
+    background: 'rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(10px)',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    '& .MuiOutlinedInput-notchedOutline': {
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+      border: '1px solid rgba(255, 255, 255, 0.3)',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+      border: `2px solid ${alpha(theme.palette.primary.main, 0.5)} !important`,
+    },
+    '&:hover': {
+      background: 'rgba(255, 255, 255, 0.12)',
+    },
+    '&.Mui-focused': {
+      background: 'rgba(255, 255, 255, 0.15)',
+    },
+  };
+
+  const menuProps = {
+    PaperProps: {
+      sx: {
+        backgroundColor: alpha(theme.palette.background.paper, 0.9),
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${alpha('#fff', 0.1)}`,
+        borderRadius: '12px',
+        maxHeight: 300,
+        '& .MuiMenuItem-root': {
+          padding: '10px 16px',
+          '&:hover': {
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+          },
+          '&.Mui-selected': {
+            backgroundColor: alpha(theme.palette.primary.main, 0.2),
+            '&:hover': {
+              backgroundColor: alpha(theme.palette.primary.main, 0.3),
+            },
+          },
+        },
+      },
+    },
+  };
+
+  const { register, control, handleSubmit, watch, setValue, getValues, trigger, formState: { errors }, reset, setError, clearErrors } = useForm({
     defaultValues: {
       sede: { departamento: '', ciudad: '', juzgado: '' },
       deudor: {
@@ -269,6 +296,9 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       },
       anexos: [],
       firma: { source: 'draw', data: null, file: null },
+      firmaDeudor: { source: 'draw', data: null, file: null },
+      bienesInventarioImagen: { name: '', url: '', descripcion: '' },
+      certificacionLaboralImagen: { name: '', url: '', descripcion: '' },
     }
   });
 
@@ -309,6 +339,8 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadingAnexos, setUploadingAnexos] = useState({});
+  const [uploadingImagenAnexo3, setUploadingImagenAnexo3] = useState(false);
+  const [uploadingImagenAnexo6, setUploadingImagenAnexo6] = useState(false);
   const [isConfirmModalOpen, setConfirmModalOpen] = useState(false);
   const [savedSections, setSavedSections] = useState({
     sede: false,
@@ -361,9 +393,19 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const [signatureSource, setSignatureSource] = useState('draw');
   const [signatureImage, setSignatureImage] = useState(null);
 
+  const sigCanvasDeudor = useRef({});
+  const signatureContainerDeudorRef = useRef(null);
+  const [deudorCanvasSize, setDeudorCanvasSize] = useState({ width: 500, height: 200 });
+  const watchedFirmaDeudorSource = watch('firmaDeudor.source');
+  const [signatureSourceDeudor, setSignatureSourceDeudor] = useState('draw');
+  const [signatureImageDeudor, setSignatureImageDeudor] = useState(null);
+
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const [currentFileToProcess, setCurrentFileToProcess] = useState(null);
   const [currentAnexoIndex, setCurrentAnexoIndex] = useState(null);
+
+  const { data: acreedoresData, isLoading } = useQuery({ queryKey: ['acreedores'], queryFn: () => getAcreedores({ pageIndex: 0, pageSize: 1000, sorting: JSON.stringify([{ id: 'nombre', desc: false }]) }) });
+  const [isAcreenciasModalOpen, setIsAcreenciasModalOpen] = useState(false);
 
   useEffect(() => {
     if (restoredRef.current) return;
@@ -392,6 +434,22 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
           const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://api.systemlex.com.co';
           setSignatureImage(`${backendUrl}${url}`);
           setValue('firma.url', url);
+        }
+      }
+
+      if (initialData.firmaDeudor) {
+        const { source, data, url } = initialData.firmaDeudor;
+        setSignatureSourceDeudor(source || 'draw');
+        if (source === 'draw' && data) {
+          setTimeout(() => {
+            if (sigCanvasDeudor.current && sigCanvasDeudor.current.fromDataURL) {
+              sigCanvasDeudor.current.fromDataURL(data);
+            }
+          }, 200);
+        } else if (source === 'upload' && url) {
+          const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://api.systemlex.com.co';
+          setSignatureImageDeudor(`${backendUrl}${url}`);
+          setValue('firmaDeudor.url', url);
         }
       }
 
@@ -446,6 +504,10 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         const { width } = signatureContainerRef.current.getBoundingClientRect();
         setCanvasSize({ width: width > 0 ? width : 500, height: 200 });
       }
+      if (signatureContainerDeudorRef.current) {
+        const { width } = signatureContainerDeudorRef.current.getBoundingClientRect();
+        setDeudorCanvasSize({ width: width > 0 ? width : 500, height: 200 });
+      }
     }
     window.addEventListener('resize', handleResize);
     handleResize();
@@ -457,6 +519,12 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       setSignatureSource(watchedFirmaSource);
     }
   }, [watchedFirmaSource]);
+
+  useEffect(() => {
+    if (watchedFirmaDeudorSource) {
+      setSignatureSourceDeudor(watchedFirmaDeudorSource);
+    }
+  }, [watchedFirmaDeudorSource]);
 
   // Verificar que noComerciante siempre esté activo para esta solicitud.
   const watchNoComerciante = watch('deudor.noComerciante');
@@ -470,6 +538,94 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
   const acreenciasValues = watch('acreencias');
   const totalAcreencias = (acreenciasValues || []).reduce((s, a) => s + (Number(a.capital) || 0), 0);
+
+  const totalCapital = (acreenciasValues || []).reduce((sum, a) => sum + (parseFloat(a.capital) || 0), 0) || 0;
+  const obligacionesEnMora = (acreenciasValues || []).filter(a => a.creditoEnMora === true && a.moraMas90Dias === true);
+  const capitalObligaciones = obligacionesEnMora.reduce((sum, a) => sum + (parseFloat(a.capital) || 0), 0) || 0;
+  const porcentajeMora = totalCapital > 0 ? (capitalObligaciones / totalCapital * 100) : 0;
+
+  const validacionLiquidacion = {
+    alMenosUnaAcreencia: (acreenciasValues || []).length >= 1,
+    hayObligacionesEnMora: obligacionesEnMora.length >= 1,
+    capitalObligacionesEnMora: capitalObligaciones > 0,
+  };
+  const cumpleRequisitos = validacionLiquidacion.alMenosUnaAcreencia && validacionLiquidacion.hayObligacionesEnMora && validacionLiquidacion.capitalObligacionesEnMora;
+
+  const getClassFromNaturaleza = (naturaleza) => {
+    if (!naturaleza) return 'QUINTA CLASE';
+    if (naturaleza.toUpperCase().includes('PRIMERA CLASE')) return 'PRIMERA CLASE';
+    if (naturaleza.toUpperCase().includes('SEGUNDA CLASE')) return 'SEGUNDA CLASE';
+    if (naturaleza.toUpperCase().includes('TERCERA CLASE')) return 'TERCERA CLASE';
+    if (naturaleza.toUpperCase().includes('CUARTA CLASE')) return 'CUARTA CLASE';
+    return 'QUINTA CLASE';
+  };
+
+  const formatMoney = (num) => {
+    const value = Number(num) || 0;
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  };
+
+  const getAcreedorData = (a) => {
+    if (!a) return null;
+    if (a.acreedor && typeof a.acreedor === 'object' && a.acreedor._id) return a.acreedor;
+    const found = acreedoresData?.rows?.find(ac => ac._id === a.acreedor);
+    return found || null;
+  };
+
+  const getAcreedorNombre = (a) => {
+    const ac = getAcreedorData(a);
+    if (ac) return ac.nombre;
+    if (!a) return 'No reporta';
+    if (typeof a.acreedor === 'string' && a.acreedor) return a.acreedor;
+    return 'No reporta';
+  };
+
+  const acreenciasPreview = (() => {
+    const lista = acreenciasValues || [];
+    const clases = ['PRIMERA CLASE', 'SEGUNDA CLASE', 'TERCERA CLASE', 'CUARTA CLASE', 'QUINTA CLASE'];
+    const grouped = lista.reduce((acc, a) => {
+      const cls = getClassFromNaturaleza(a.naturalezaCredito);
+      if (!acc[cls]) acc[cls] = [];
+      acc[cls].push(a);
+      return acc;
+    }, {});
+    const clasesConDatos = clases.filter(cls => grouped[cls] && grouped[cls].length > 0);
+    return { grouped, clasesConDatos, total: totalCapital };
+  })();
+
+  const handleSignatureDeudorFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setValue('firmaDeudor.file', file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSignatureImageDeudor(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImagenAnexoChange = (path, setUploading) => async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { fileUrl, uniqueFilename } = await uploadFile(file);
+      setValue(`${path}.name`, uniqueFilename, { shouldValidate: true });
+      setValue(`${path}.url`, fileUrl, { shouldValidate: true });
+    } catch (error) {
+      console.error('Error subiendo imagen del anexo:', error);
+      setError(`${path}.url`, { type: 'manual', message: 'Error al subir el archivo' });
+    } finally {
+      setUploading(false);
+      e.target.value = null;
+    }
+  };
+
+  const imagenAnexo3Url = watch('bienesInventarioImagen.url');
+  const imagenAnexo3Name = watch('bienesInventarioImagen.name');
+  const imagenAnexo6Url = watch('certificacionLaboralImagen.url');
+  const imagenAnexo6Name = watch('certificacionLaboralImagen.name');
 
   const handleSignatureFileUpload = (e) => {
     const file = e.target.files[0];
@@ -533,7 +689,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       case 'entidadesFinancieras': fieldsToValidate = ['entidadesFinancieras']; break;
       case 'informacionFinanciera': fieldsToValidate = ['informacionFinanciera']; break;
       case 'anexos': fieldsToValidate = ['anexos']; break;
-      case 'firma': fieldsToValidate = ['firma']; break;
+      case 'firma': fieldsToValidate = ['firma', 'firmaDeudor']; break;
       default: break;
     }
 
@@ -576,6 +732,17 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
     const dataToSend = {
       ...data,
+      acreencias: (data.acreencias || []).map((a) => {
+        const acreedorData = acreedoresData?.rows?.find(ac => ac._id === a.acreedor);
+        return {
+          ...a,
+          acreedor: acreedorData || a.acreedor,
+          creditoEnMora: !!a.creditoEnMora,
+          moraMas90Dias: !!a.moraMas90Dias,
+          pagoPorLibranza: !!a.pagoPorLibranza,
+          creditoPostergado: !!a.creditoPostergado,
+        };
+      }),
       pruebas: (data.pruebas || []).map((p) => (p || '').trim()).filter(Boolean),
       anexos: (data.anexos || []).map(anexo => ({
         ...anexo,
@@ -609,6 +776,26 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       dataToSend.firma = {
         source: 'draw',
         data: sigCanvas.current.getTrimmedCanvas().toDataURL('image/png')
+      };
+    }
+
+    // Process Deudor Signature File
+    if (signatureSourceDeudor === 'upload' && dataToSend.firmaDeudor?.file instanceof File) {
+      try {
+        const { fileUrl, uniqueFilename } = await uploadFile(dataToSend.firmaDeudor.file);
+        dataToSend.firmaDeudor = {
+          source: 'upload',
+          name: uniqueFilename || dataToSend.firmaDeudor.file.name,
+          url: fileUrl,
+        };
+      } catch (error) {
+        console.error('Error uploading deudor signature:', error);
+        dataToSend.firmaDeudor = { ...dataToSend.firmaDeudor, error: 'Upload failed' };
+      }
+    } else if (signatureSourceDeudor === 'draw' && sigCanvasDeudor.current && !sigCanvasDeudor.current.isEmpty()) {
+      dataToSend.firmaDeudor = {
+        source: 'draw',
+        data: sigCanvasDeudor.current.getTrimmedCanvas().toDataURL('image/png')
       };
     }
 
@@ -671,7 +858,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     { key: 'sede', label: 'Sede / Juzgado', icon: LocationCityIcon, color: '#673ab7' },
     { key: 'deudor', label: 'Deudor', icon: PersonIcon, color: '#2196f3' },
     { key: 'apoderado', label: 'Apoderado', icon: GavelIcon, color: '#ff9800' },
-    { key: 'acreencias', label: 'Obligaciones', icon: ReceiptIcon, color: '#ff5722' },
+    { key: 'acreencias', label: 'Acreencias', icon: ReceiptIcon, color: '#ff5722' },
     { key: 'procesosJudiciales', label: 'Procesos', icon: AccountBalanceIcon, color: '#f44336' },
     { key: 'entidadesFinancieras', label: 'Centrales de Riesgo', icon: BusinessIcon, color: '#9c27b0' },
     { key: 'informacionFinanciera', label: 'Financiera', icon: TrendingUpIcon, color: '#4caf50' },
@@ -980,50 +1167,717 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={3}>
-          <Stack spacing={3}>
-            {acreenciasFields.map((field, index) => (
-              <GlassCard key={field.id} sx={{ p: 3 }}>
-                <Stack spacing={2}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Chip avatar={<Avatar><ReceiptIcon /></Avatar>} label={`Obligación / Acreencia #${index + 1}`} />
-                    <IconButton onClick={() => removeAcreencia(index)} size="small"><DeleteIcon /></IconButton>
+          <GlassCard>
+            <Box sx={{ p: 3 }}>
+              <Stack spacing={3}>
+                <Controller
+                  name="acreencias"
+                  control={control}
+                  rules={{
+                    validate: value => (value || []).length >= 1 || 'Debe agregar al menos una acreencia'
+                  }}
+                  render={() => (
+                    <>
+                      {errors.acreencias?.root && (
+                        <FormHelperText error>{errors.acreencias.root.message}</FormHelperText>
+                      )}
+                    </>
+                  )}
+                />
+
+                <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Avatar sx={{ bgcolor: alpha(tabsConfig[3].color, 0.1), color: tabsConfig[3].color }}>
+                      <AccountBalanceIcon />
+                    </Avatar>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      Relación de Acreencias
+                    </Typography>
                   </Stack>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}><GlassTextField {...register(`acreencias.${index}.nombreAcreedor`, { required: 'Campo requerido' })} label="Nombre del Acreedor" fullWidth error={errors.acreencias?.[index]?.nombreAcreedor} helperText={errors.acreencias?.[index]?.nombreAcreedor?.message} /></Grid>
-                    <Grid item xs={12} sm={6}><GlassSelect control={control} name={`acreencias.${index}.tipoAcreedor`} label="Tipo de Acreedor" options={[
-                      { value: 'Entidad Financiera', label: 'Entidad Financiera' },
-                      { value: 'Entidad Cooperativa', label: 'Entidad Cooperativa' },
-                      { value: 'Comerciante', label: 'Comerciante' },
-                      { value: 'Persona Natural', label: 'Persona Natural' },
-                      { value: 'Entidad Pública', label: 'Entidad Pública' },
-                      { value: 'Fondo de Empleados', label: 'Fondo de Empleados' },
-                      { value: 'Otro', label: 'Otro' },
-                    ]} rules={{ required: 'Campo requerido' }} error={errors.acreencias?.[index]?.tipoAcreedor} /></Grid>
-                    <Grid item xs={12} sm={6}><GlassTextField {...register(`acreencias.${index}.naturaleza`, { required: 'Campo requerido' })} label="Naturaleza de la Obligación" fullWidth error={errors.acreencias?.[index]?.naturaleza} helperText={errors.acreencias?.[index]?.naturaleza?.message} /></Grid>
-                    <Grid item xs={12} sm={6}><GlassTextField {...register(`acreencias.${index}.capital`, { required: 'Campo requerido', valueAsNumber: true })} label="Capital ($)" type="number" fullWidth error={errors.acreencias?.[index]?.capital} helperText={errors.acreencias?.[index]?.capital?.message} /></Grid>
-                  </Grid>
+
+                  <Button
+                    variant="outlined"
+                    onClick={() => appendAcreencia({ diasDeMora: '', moraMas90Dias: false, capital: '', creditoEnMora: false, pagoPorLibranza: false, creditoPostergado: false })}
+                    startIcon={<AddIcon />}
+                    sx={{
+                      borderRadius: '12px',
+                      borderColor: alpha(tabsConfig[3].color, 0.3),
+                      color: tabsConfig[3].color,
+                      '&:hover': {
+                        borderColor: tabsConfig[3].color,
+                        background: alpha(tabsConfig[3].color, 0.1),
+                      },
+                    }}
+                  >
+                    Agregar
+                  </Button>
                 </Stack>
-              </GlassCard>
-            ))}
-            <Button variant="outlined" onClick={() => appendAcreencia({})} startIcon={<AddIcon />}>Añadir Obligación / Acreencia</Button>
-            {errors.acreencias?.root && <FormHelperText error>{errors.acreencias.root.message}</FormHelperText>}
-            {acreenciasFields.length > 0 && (
-              <Chip
-                icon={<AccountBalanceWalletIcon />}
-                label={`Total Capital: $ ${totalAcreencias.toLocaleString('es-CO')}`}
-                sx={{
-                  background: alpha(theme.palette.info.main, 0.1),
-                  color: theme.palette.info.main,
-                  fontWeight: 700,
-                  alignSelf: 'flex-start',
-                  fontSize: '1rem',
-                }}
-              />
-            )}
-            <Button variant="contained" onClick={() => handleSaveSection('acreencias', 4)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
-              {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
-            </Button>
-          </Stack>
+
+                {acreenciasFields.length === 0 ? (
+                  <Box
+                    sx={{
+                      py: 6,
+                      textAlign: 'center',
+                      color: 'text.secondary',
+                    }}
+                  >
+                    <WarningIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                    <Typography variant="body1">
+                      No hay acreencias agregadas. Haga clic en "Agregar" para comenzar.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Stack spacing={2}>
+                    {acreenciasFields.map((field, index) => {
+                      const capital = parseFloat(watch(`acreencias.${index}.capital`)) || 0;
+                      const interesCorriente = parseFloat(watch(`acreencias.${index}.valorTotalInteresCorriente`)) || 0;
+                      const interesMoratorio = parseFloat(watch(`acreencias.${index}.valorTotalInteresMoratorio`)) || 0;
+                      const cuantiaTotal = capital + interesCorriente + interesMoratorio;
+
+                      return (
+                        <Box key={field.id}>
+                          <GlassCard
+                            sx={{
+                              border: `1px solid ${alpha(tabsConfig[3].color, 0.2)}`,
+                            }}
+                          >
+                            <Box sx={{ p: 2 }}>
+                              <Stack spacing={2}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                  <Chip
+                                    label={`Acreencia #${index + 1}`}
+                                    size="small"
+                                    sx={{
+                                      background: alpha(tabsConfig[3].color, 0.1),
+                                      color: tabsConfig[3].color,
+                                      fontWeight: 600,
+                                    }}
+                                  />
+                                  <IconButton
+                                    onClick={() => removeAcreencia(index)}
+                                    size="small"
+                                    sx={{
+                                      color: theme.palette.error.main,
+                                      '&:hover': {
+                                        background: alpha(theme.palette.error.main, 0.1),
+                                      },
+                                    }}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Stack>
+
+                                <Grid container spacing={2}>
+                                  <Grid item xs={12}>
+                                    <FormControl fullWidth error={!!errors.acreencias?.[index]?.acreedor}>
+                                      <Controller
+                                        name={`acreencias.${index}.acreedor`}
+                                        control={control}
+                                        rules={{ required: "Campo requerido" }}
+                                        render={({ field }) => {
+                                          const options = acreedoresData?.rows?.map((a) => ({
+                                            value: a._id,
+                                            label: a.nombre,
+                                          })) || [];
+                                          return (
+                                            <>
+                                              <ReactSelect
+                                                {...field}
+                                                isClearable
+                                                options={options}
+                                                value={options.find(option => option.value === field.value)}
+                                                onChange={option => field.onChange(option ? option.value : '')}
+                                                isLoading={isLoading}
+                                                placeholder="Selecciona un acreedor..."
+                                                menuPortalTarget={document.body}
+                                                styles={{
+                                                  control: (base) => ({
+                                                    ...base,
+                                                    backgroundColor: '#f9fafb',
+                                                    border: '1px solid #d1d5db',
+                                                    borderRadius: 8,
+                                                    minHeight: 48,
+                                                    fontSize: '15px',
+                                                    paddingLeft: 2,
+                                                    boxShadow: 'none',
+                                                    '&:hover': { borderColor: '#9ca3af' },
+                                                  }),
+                                                  menuPortal: (base) => ({
+                                                    ...base,
+                                                    zIndex: 9999,
+                                                  }),
+                                                  menu: (base) => ({
+                                                    ...base,
+                                                    width: "max-content",
+                                                    minWidth: "100%",
+                                                  }),
+                                                }}
+                                              />
+                                              {errors.acreencias?.[index]?.acreedor && (
+                                                <FormHelperText>{errors.acreencias?.[index]?.acreedor?.message}</FormHelperText>
+                                              )}
+                                            </>
+                                          );
+                                        }}
+                                      />
+                                    </FormControl>
+                                  </Grid>
+
+                                  <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth error={!!errors.acreencias?.[index]?.tipoAcreencia}>
+                                      <InputLabel>Tipo de Acreencia</InputLabel>
+                                      <Controller
+                                        name={`acreencias.${index}.tipoAcreencia`}
+                                        control={control}
+                                        defaultValue=""
+                                        rules={{ required: 'Campo requerido' }}
+                                        render={({ field }) => (
+                                          <Select
+                                            {...field}
+                                            label="Tipo de Acreencia"
+                                            sx={selectSx}
+                                          >
+                                            <MenuItem value="Deudor">Deudor</MenuItem>
+                                            <MenuItem value="Codeudor">Codeudor</MenuItem>
+                                            <MenuItem value="Avalista">Avalista</MenuItem>
+                                            <MenuItem value="Fiador">Fiador</MenuItem>
+                                            <MenuItem value="Desconozco esta Información">Desconozco esta Información</MenuItem>
+                                            <MenuItem value="Otro">Otro</MenuItem>
+                                          </Select>
+                                        )}
+                                      />
+                                      {errors.acreencias?.[index]?.tipoAcreencia && <FormHelperText>{errors.acreencias?.[index]?.tipoAcreencia?.message}</FormHelperText>}
+                                    </FormControl>
+                                  </Grid>
+                                  {watch(`acreencias.${index}.tipoAcreencia`) === 'Otro' && (
+                                    <Grid item xs={12} sm={8}>
+                                      <GlassTextField
+                                        {...register(`acreencias.${index}.otroTipoAcreencia`, { required: 'Campo requerido' })}
+                                        label="Descripción del Tipo de Acreencia"
+                                        fullWidth
+                                      />
+                                    </Grid>
+                                  )}
+
+                                  <Grid item xs={12} sm={8}>
+                                    <FormControl fullWidth error={!!errors.acreencias?.[index]?.naturalezaCredito}>
+                                      <InputLabel>Naturaleza del Crédito</InputLabel>
+                                      <Controller
+                                        name={`acreencias.${index}.naturalezaCredito`}
+                                        control={control}
+                                        defaultValue=""
+                                        rules={{ required: 'Campo requerido' }}
+                                        render={({ field }) => (
+                                          <Select
+                                            {...field}
+                                            label="Naturaleza del Crédito"
+                                            sx={selectSx}
+                                            MenuProps={menuProps}
+                                          >
+                                            <MenuItem value="Primera Clase: Alimentos de Menores">Primera Clase: Alimentos de Menores</MenuItem>
+                                            <MenuItem value="Primera Clase: Obligaciones Laborales">Primera Clase: Obligaciones Laborales</MenuItem>
+                                            <MenuItem value="Primera Clase: Obligaciones con el Fisco">Primera Clase: Obligaciones con el Fisco</MenuItem>
+                                            <MenuItem value="Segunda Clase: Prendario">Segunda Clase: Prendario</MenuItem>
+                                            <MenuItem value="Tercera Clase: Hipotecarios - Escritura">Tercera Clase: Hipotecarios - Escritura</MenuItem>
+                                            <MenuItem value="Cuarta Clase: Proveedores Estratégicos">Cuarta Clase: Proveedores Estratégicos</MenuItem>
+                                            <MenuItem value="Quinta clase: Quirografarios - Letras">Quinta clase: Quirografarios - Letras</MenuItem>
+                                            <MenuItem value="Quinta clase: Quirografarios - Pagaré">Quinta clase: Quirografarios - Pagaré</MenuItem>
+                                            <MenuItem value="Quinta clase: Quirografarios - Cheque">Quinta clase: Quirografarios - Cheque</MenuItem>
+                                            <MenuItem value="Quinta clase: Quirografarios - Factura">Quinta clase: Quirografarios - Factura</MenuItem>
+                                            <MenuItem value="Quinta clase: Quirografarios - Sentencia Judicial">Quinta clase: Quirografarios - Sentencia Judicial</MenuItem>
+                                            <MenuItem value="Quinta clase: Quirografarios - Leasing">Quinta clase: Quirografarios - Leasing</MenuItem>
+                                            <MenuItem value="Quinta clase: Quirografarios - Leasing - Vehículo">Quinta clase: Quirografarios - Leasing - Vehículo</MenuItem>
+                                            <MenuItem value="Quinta clase: Quirografarios - Leasing - Maquinaria">Quinta clase: Quirografarios - Leasing - Maquinaria</MenuItem>
+                                            <MenuItem value="Quinta clase: Sin Documento">Quinta clase: Sin Documento</MenuItem>
+                                            <MenuItem value="Quinta clase: Cánones Vencidos de los Contratos de Leasing">Quinta clase: Cánones Vencidos de los Contratos de Leasing</MenuItem>
+                                          </Select>
+                                        )}
+                                      />
+                                      {errors.acreencias?.[index]?.naturalezaCredito && <FormHelperText>{errors.acreencias?.[index]?.naturalezaCredito?.message}</FormHelperText>}
+                                    </FormControl>
+                                  </Grid>
+
+                                  <Grid item xs={12}>
+                                    <GlassTextField
+                                      {...register(`acreencias.${index}.descripcionCredito`, { required: 'Campo requerido' })}
+                                      label="Descripción del Crédito"
+                                      fullWidth
+                                      error={!!errors.acreencias?.[index]?.descripcionCredito}
+                                      helperText={errors.acreencias?.[index]?.descripcionCredito?.message}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={6} sm={3}>
+                                    <GlassTextField
+                                      {...register(`acreencias.${index}.capital`, { required: 'Campo requerido' })}
+                                      label="Valor en Capital"
+                                      type="number"
+                                      fullWidth
+                                      error={!!errors.acreencias?.[index]?.capital}
+                                      helperText={errors.acreencias?.[index]?.capital?.message}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={6} sm={3}>
+                                    <GlassTextField
+                                      {...register(`acreencias.${index}.valorTotalInteresCorriente`)}
+                                      label="Valor Total Interés Corriente"
+                                      type="number"
+                                      fullWidth
+                                      sx={{ minWidth: 250 }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={6} sm={3}>
+                                    <GlassTextField
+                                      {...register(`acreencias.${index}.tasaInteresCorriente`)}
+                                      label="Tasa de Interés Corriente"
+                                      fullWidth
+                                      sx={{ minWidth: 250 }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={6} sm={3}>
+                                    <FormControl fullWidth>
+                                      <InputLabel>Tipo de Interés Corriente</InputLabel>
+                                      <Controller
+                                        name={`acreencias.${index}.tipoInteresCorriente`}
+                                        control={control}
+                                        defaultValue=""
+                                        render={({ field }) => (
+                                          <Select
+                                            {...field}
+                                            label="Tipo de Interés Corriente"
+                                            sx={selectSx}
+                                          >
+                                            <MenuItem value="Efectivo Anual">Efectivo Anual</MenuItem>
+                                            <MenuItem value="Efectivo Mensual">Efectivo Mensual</MenuItem>
+                                            <MenuItem value="Nominal Mensual">Nominal Mensual</MenuItem>
+                                            <MenuItem value="Nominal Anual">Nominal Anual</MenuItem>
+                                          </Select>
+                                        )}
+                                      />
+                                    </FormControl>
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Controller
+                                      name={`acreencias.${index}.pagoPorLibranza`}
+                                      control={control}
+                                      render={({ field }) => (
+                                        <FormControlLabel
+                                          control={
+                                            <Checkbox
+                                              {...field}
+                                              checked={field.value}
+                                            />
+                                          }
+                                          label="¿El pago del crédito se está realizando mediante libranza o cualquier otro tipo de descuento por nómina?"
+                                        />
+                                      )}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Controller
+                                      name={`acreencias.${index}.creditoPostergado`}
+                                      control={control}
+                                      render={({ field }) => (
+                                        <FormControlLabel
+                                          control={
+                                            <Checkbox
+                                              {...field}
+                                              checked={field.value}
+                                            />
+                                          }
+                                          label={
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                              Condición de crédito legalmente postergado (Artículo 572A, Causal 1).
+                                              <Tooltip
+                                                title="(Artículo 572A, Causal 1) Deudas cuyo titular sea el cónyuge del deudor o sus parientes hasta el cuarto grado de consanguinidad, segundo de afinidad o único civil."
+                                              >
+                                                <InfoIcon sx={{ ml: 1, fontSize: '1rem' }} />
+                                              </Tooltip>
+                                            </Box>
+                                          }
+                                        />
+                                      )}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={6} sm={4}>
+                                    <Controller
+                                      name={`acreencias.${index}.creditoEnMora`}
+                                      control={control}
+                                      render={({ field }) => (
+                                        <FormControlLabel
+                                          control={
+                                            <Checkbox
+                                              {...field}
+                                              checked={field.value}
+                                              onChange={(e) => {
+                                                const isChecked = e.target.checked;
+                                                field.onChange(isChecked);
+                                                if (isChecked) {
+                                                  setValue(`acreencias.${index}.moraMas90Dias`, true);
+                                                  setValue(`acreencias.${index}.diasDeMora`, '');
+                                                }
+                                              }}
+                                            />
+                                          }
+                                          label="¿El crédito está en mora?"
+                                        />
+                                      )}
+                                    />
+                                  </Grid>
+                                  {watch(`acreencias.${index}.creditoEnMora`) && (
+                                    <>
+                                      {!watch(`acreencias.${index}.moraMas90Dias`) && (
+                                        <Grid item xs={6} sm={4}>
+                                          <Controller
+                                            name={`acreencias.${index}.diasDeMora`}
+                                            control={control}
+                                            render={({ field, fieldState: { error } }) => (
+                                              <GlassTextField
+                                                {...field}
+                                                label="Días de mora"
+                                                type="number"
+                                                fullWidth
+                                                error={!!error}
+                                                helperText={error?.message}
+                                                onChange={(e) => {
+                                                  field.onChange(e);
+                                                  const dias = e.target.value;
+                                                  if (dias && dias >= 0) {
+                                                    const today = new Date();
+                                                    today.setDate(today.getDate() - parseInt(dias, 10));
+                                                    const year = today.getFullYear();
+                                                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                                                    const day = String(today.getDate()).padStart(2, '0');
+                                                    const fechaVencimientoCalculada = `${year}-${month}-${day}`;
+                                                    if (getValues(`acreencias.${index}.fechaVencimiento`) !== fechaVencimientoCalculada) {
+                                                      setValue(`acreencias.${index}.fechaVencimiento`, fechaVencimientoCalculada);
+                                                    }
+                                                  } else {
+                                                    if (getValues(`acreencias.${index}.fechaVencimiento`) !== '') {
+                                                      setValue(`acreencias.${index}.fechaVencimiento`, '');
+                                                    }
+                                                  }
+                                                }}
+                                              />
+                                            )}
+                                          />
+                                        </Grid>
+                                      )}
+                                      <Grid item xs={12} sm={4}>
+                                        <Controller
+                                          name={`acreencias.${index}.moraMas90Dias`}
+                                          control={control}
+                                          render={({ field }) => (
+                                            <FormControlLabel
+                                              control={
+                                                <Checkbox
+                                                  {...field}
+                                                  checked={field.value}
+                                                  onChange={(e) => {
+                                                    const isChecked = e.target.checked;
+                                                    if (isChecked) {
+                                                      const fechaVencimientoStr = getValues(`acreencias.${index}.fechaVencimiento`);
+                                                      if (fechaVencimientoStr) {
+                                                        const today = new Date();
+                                                        today.setHours(0, 0, 0, 0);
+                                                        const fechaVencimiento = new Date(fechaVencimientoStr);
+                                                        if (!isNaN(fechaVencimiento.getTime()) && fechaVencimiento < today) {
+                                                          const diffTime = Math.abs(today - fechaVencimiento);
+                                                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                          if (diffDays <= 90) {
+                                                            setError(`acreencias.${index}.fechaVencimiento`, {
+                                                              type: 'manual',
+                                                              message: 'La fecha indica menos de 90 días de mora.'
+                                                            });
+                                                            return;
+                                                          }
+                                                        }
+                                                      }
+                                                      clearErrors(`acreencias.${index}.fechaVencimiento`);
+                                                      clearErrors(`acreencias.${index}.diasDeMora`);
+                                                      setValue(`acreencias.${index}.diasDeMora`, '');
+                                                    } else {
+                                                      clearErrors(`acreencias.${index}.fechaVencimiento`);
+                                                    }
+                                                    field.onChange(isChecked);
+                                                  }}
+                                                />
+                                              }
+                                              label="¿Mora por más de 90 días?"
+                                            />
+                                          )}
+                                        />
+                                      </Grid>
+                                      <Grid item xs={6} sm={4}>
+                                        <GlassTextField
+                                          {...register(`acreencias.${index}.valorTotalInteresMoratorio`)}
+                                          label="Valor Total Interés Moratorio"
+                                          type="number"
+                                          fullWidth
+                                          sx={{ minWidth: 250 }}
+                                        />
+                                      </Grid>
+                                      <Grid item xs={6} sm={4}>
+                                        <GlassTextField
+                                          {...register(`acreencias.${index}.tasaInteresMoratorio`)}
+                                          label="Tasa de Interés Moratorio"
+                                          fullWidth
+                                          sx={{ minWidth: 250 }}
+                                        />
+                                      </Grid>
+                                      <Grid item xs={6} sm={4}>
+                                        <FormControl fullWidth>
+                                          <InputLabel>Tipo de Interés Moratorio</InputLabel>
+                                          <Controller
+                                            name={`acreencias.${index}.tipoInteresMoratorio`}
+                                            control={control}
+                                            defaultValue=""
+                                            render={({ field: selectField }) => (
+                                              <Select
+                                                {...selectField}
+                                                label="Tipo de Interés Moratorio"
+                                                sx={selectSx}
+                                              >
+                                                <MenuItem value="Efectivo Anual">Efectivo Anual</MenuItem>
+                                                <MenuItem value="Efectivo Mensual">Efectivo Mensual</MenuItem>
+                                                <MenuItem value="Nominal Mensual">Nominal Mensual</MenuItem>
+                                                <MenuItem value="Nominal Anual">Nominal Anual</MenuItem>
+                                              </Select>
+                                            )}
+                                          />
+                                        </FormControl>
+                                      </Grid>
+                                    </>
+                                  )}
+
+                                  <Grid item xs={6} sm={6}>
+                                    <GlassTextField
+                                      {...register(`acreencias.${index}.fechaOtorgamiento`)}
+                                      label="Fecha de Otorgamiento"
+                                      type="date"
+                                      InputLabelProps={{ shrink: true }}
+                                      fullWidth
+                                    />
+                                  </Grid>
+                                  <Grid item xs={6} sm={6}>
+                                    <GlassTextField
+                                      {...register(`acreencias.${index}.fechaVencimiento`, {
+                                        onChange: (e) => {
+                                          const fechaVencimientoStr = e.target.value;
+                                          const acreencia = getValues(`acreencias.${index}`);
+                                          if (acreencia.creditoEnMora && fechaVencimientoStr) {
+                                            const today = new Date();
+                                            today.setHours(0, 0, 0, 0);
+                                            const fechaVencimiento = new Date(fechaVencimientoStr);
+                                            if (acreencia.moraMas90Dias) {
+                                              if (!isNaN(fechaVencimiento.getTime()) && fechaVencimiento < today) {
+                                                const diffTime = Math.abs(today - fechaVencimiento);
+                                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                if (diffDays <= 90) {
+                                                  setError(`acreencias.${index}.fechaVencimiento`, {
+                                                    type: 'manual',
+                                                    message: 'La fecha debe ser > 90 días.'
+                                                  });
+                                                } else {
+                                                  clearErrors(`acreencias.${index}.fechaVencimiento`);
+                                                }
+                                              }
+                                            } else {
+                                              clearErrors(`acreencias.${index}.fechaVencimiento`);
+                                              if (!isNaN(fechaVencimiento.getTime()) && fechaVencimiento < today) {
+                                                const diffTime = Math.abs(today - fechaVencimiento);
+                                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                if (String(getValues(`acreencias.${index}.diasDeMora`)) !== String(diffDays)) {
+                                                  setValue(`acreencias.${index}.diasDeMora`, diffDays);
+                                                }
+                                              } else {
+                                                if (String(getValues(`acreencias.${index}.diasDeMora`)) !== '0') {
+                                                  setValue(`acreencias.${index}.diasDeMora`, 0);
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      })}
+                                      label="Fecha de Vencimiento"
+                                      type="date"
+                                      InputLabelProps={{ shrink: true }}
+                                      fullWidth
+                                      error={!!errors.acreencias?.[index]?.fechaVencimiento}
+                                      helperText={errors.acreencias?.[index]?.fechaVencimiento?.message}
+                                    />
+                                  </Grid>
+
+                                  <Grid item xs={12}>
+                                    <Box
+                                      sx={{
+                                        p: 2,
+                                        borderRadius: '12px',
+                                        background: alpha(theme.palette.info.main, 0.05),
+                                        border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                                      }}
+                                    >
+                                      <Stack direction="row" spacing={1} alignItems="center">
+                                        <AttachMoneyIcon sx={{ color: theme.palette.info.main }} />
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                          Cuantía Total:
+                                        </Typography>
+                                        <Typography variant="h6" sx={{ color: theme.palette.info.main, fontWeight: 700 }}>
+                                          {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(cuantiaTotal)}
+                                        </Typography>
+                                      </Stack>
+                                    </Box>
+                                  </Grid>
+                                </Grid>
+                              </Stack>
+                            </Box>
+                          </GlassCard>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                )}
+
+                {/* Vista previa de Acreencias */}
+                <Stack direction="row" justifyContent="flex-end">
+                  <Button
+                    variant="contained"
+                    onClick={() => setIsAcreenciasModalOpen(true)}
+                    startIcon={<AccountBalanceIcon />}
+                    sx={{
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      background: `linear-gradient(135deg, ${tabsConfig[3].color}, ${alpha(tabsConfig[3].color, 0.7)})`,
+                      '&:hover': {
+                        background: `linear-gradient(135deg, ${alpha(tabsConfig[3].color, 0.9)}, ${alpha(tabsConfig[3].color, 0.6)})`,
+                        transform: 'translateY(-2px)',
+                      },
+                    }}
+                  >
+                    Ver Relación de Acreencias
+                  </Button>
+                </Stack>
+
+                {/* Análisis de Requisitos */}
+                <GlassCard
+                  hover={false}
+                  sx={{
+                    border: `2px solid ${alpha(cumpleRequisitos ? theme.palette.success.main : theme.palette.error.main, 0.3)}`,
+                    background: `linear-gradient(135deg, ${alpha(cumpleRequisitos ? theme.palette.success.main : theme.palette.error.main, 0.1)} 0%, ${alpha(cumpleRequisitos ? theme.palette.success.main : theme.palette.error.main, 0.05)} 100%)`,
+                  }}
+                >
+                  <Box sx={{ p: 3 }}>
+                    <Stack spacing={2}>
+                      <Stack direction="row" spacing={2} alignItems="center">
+                        <Avatar sx={{ bgcolor: alpha(cumpleRequisitos ? theme.palette.success.main : theme.palette.error.main, 0.1) }}>
+                          {cumpleRequisitos ? <VerifiedIcon sx={{ color: theme.palette.success.main }} /> : <WarningIcon sx={{ color: theme.palette.error.main }} />}
+                        </Avatar>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          Análisis de Requisitos de Liquidación
+                        </Typography>
+                      </Stack>
+
+                      <Divider />
+
+                      <Grid container spacing={2}>
+                        <Grid item xs={6} sm={4}>
+                          <Box sx={{ textAlign: 'center', p: 2, borderRadius: '12px', background: 'rgba(255, 255, 255, 0.05)' }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>Total Capital</Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+                              {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(totalCapital)}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6} sm={4}>
+                          <Box sx={{ textAlign: 'center', p: 2, borderRadius: '12px', background: 'rgba(255, 255, 255, 0.05)' }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>Capital en Mora (&gt;90 días)</Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+                              {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(capitalObligaciones)}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Box sx={{ textAlign: 'center', p: 2, borderRadius: '12px', background: 'rgba(255, 255, 255, 0.05)' }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>% en Mora (&gt;90 días)</Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+                              {porcentajeMora.toFixed(2)}%
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+
+                      <Stack spacing={1}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {validacionLiquidacion.alMenosUnaAcreencia ? (
+                            <CheckCircleIcon sx={{ color: theme.palette.success.main, fontSize: 20 }} />
+                          ) : (
+                            <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: 20 }} />
+                          )}
+                          <Typography variant="body2" sx={{ color: validacionLiquidacion.alMenosUnaAcreencia ? 'text.primary' : 'text.secondary' }}>
+                            Al menos una acreencia registrada
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {validacionLiquidacion.hayObligacionesEnMora ? (
+                            <CheckCircleIcon sx={{ color: theme.palette.success.main, fontSize: 20 }} />
+                          ) : (
+                            <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: 20 }} />
+                          )}
+                          <Typography variant="body2" sx={{ color: validacionLiquidacion.hayObligacionesEnMora ? 'text.primary' : 'text.secondary' }}>
+                            Obligaciones en mora por más de 90 días
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {validacionLiquidacion.capitalObligacionesEnMora ? (
+                            <CheckCircleIcon sx={{ color: theme.palette.success.main, fontSize: 20 }} />
+                          ) : (
+                            <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: 20 }} />
+                          )}
+                          <Typography variant="body2" sx={{ color: validacionLiquidacion.capitalObligacionesEnMora ? 'text.primary' : 'text.secondary' }}>
+                            Capital en mora por más de 90 días
+                          </Typography>
+                        </Stack>
+                      </Stack>
+
+                      <Box
+                        sx={{
+                          p: 2,
+                          borderRadius: '12px',
+                          background: alpha(cumpleRequisitos ? theme.palette.success.main : theme.palette.error.main, 0.1),
+                          textAlign: 'center',
+                        }}
+                      >
+                        <Typography variant="h6" sx={{ color: cumpleRequisitos ? 'success.main' : 'error.main', fontWeight: 700 }}>
+                          {cumpleRequisitos ? '✓ CUMPLE CON LOS REQUISITOS' : '✗ NO CUMPLE LOS REQUISITOS'}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                </GlassCard>
+                <Button
+                  variant="contained"
+                  onClick={() => handleSaveSection('acreencias', 4)}
+                  disabled={isSaving}
+                  startIcon={isSaving ? null : <SaveIcon />}
+                  sx={{
+                    mt: 2,
+                    py: 1.5,
+                    px: 4,
+                    borderRadius: '12px',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    background: `linear-gradient(135deg, ${tabsConfig[3].color}, ${alpha(tabsConfig[3].color, 0.7)})`,
+                    '&:hover': {
+                      background: `linear-gradient(135deg, ${alpha(tabsConfig[3].color, 0.9)}, ${alpha(tabsConfig[3].color, 0.6)})`,
+                      transform: 'translateY(-2px)',
+                    },
+                  }}
+                >
+                  {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
+                </Button>
+              </Stack>
+            </Box>
+          </GlassCard>
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
@@ -1090,9 +1944,9 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
               <Typography variant="h6">Información Financiera</Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.cuantiaTotal', { valueAsNumber: true })} label="Cuantía Total (si no se diligenció, se calcula de las obligaciones)" type="number" fullWidth error={!!errors.informacionFinanciera?.cuantiaTotal} helperText={errors.informacionFinanciera?.cuantiaTotal?.message} /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.numeroObligaciones', { required: 'Campo requerido', valueAsNumber: true })} label="Número de Obligaciones" type="number" fullWidth error={!!errors.informacionFinanciera?.numeroObligaciones} helperText={errors.informacionFinanciera?.numeroObligaciones?.message} /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.numeroAcreedores', { required: 'Campo requerido', valueAsNumber: true })} label="Número de Acreedores" type="number" fullWidth error={!!errors.informacionFinanciera?.numeroAcreedores} helperText={errors.informacionFinanciera?.numeroAcreedores?.message} /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.porcentajePasivo', { required: 'Campo requerido', valueAsNumber: true })} label="Porcentaje del Pasivo (%)" type="number" fullWidth error={!!errors.informacionFinanciera?.porcentajePasivo} helperText={errors.informacionFinanciera?.porcentajePasivo?.message} /></Grid>
+                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.numeroObligaciones', { valueAsNumber: true })} label="Número de Obligaciones (opcional)" type="number" fullWidth helperText="Se calcula automáticamente de acreencias en mora >90 días si deja vacío" /></Grid>
+                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.numeroAcreedores', { valueAsNumber: true })} label="Número de Acreedores (opcional)" type="number" fullWidth helperText="Se calcula automáticamente si deja vacío" /></Grid>
+                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.porcentajePasivo', { valueAsNumber: true })} label="Porcentaje del Pasivo (%) (opcional)" type="number" fullWidth helperText="Se calcula automáticamente si deja vacío" /></Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.ingresosMensuales', { required: 'Campo requerido', valueAsNumber: true })} label="Ingresos Mensuales ($)" type="number" fullWidth error={!!errors.informacionFinanciera?.ingresosMensuales} helperText={errors.informacionFinanciera?.ingresosMensuales?.message} /></Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.entidadEmpleadora', { required: 'Campo requerido' })} label="Entidad Empleadora" fullWidth error={!!errors.informacionFinanciera?.entidadEmpleadora} helperText={errors.informacionFinanciera?.entidadEmpleadora?.message} /></Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.cargoEmpleo', { required: 'Campo requerido' })} label="Cargo en la Entidad" fullWidth error={!!errors.informacionFinanciera?.cargoEmpleo} helperText={errors.informacionFinanciera?.cargoEmpleo?.message} /></Grid>
@@ -1158,6 +2012,67 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                   ))}
                 </Box>
               )}
+            </Stack>
+          </GlassCard>
+
+          <GlassCard sx={{ p: 3, mt: 3 }}>
+            <Stack spacing={2}>
+              <Typography variant="h6">Anexo 3 y Anexo 6: Imágenes</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Suba la imagen del inventario de bienes (Anexo 3) y la certificación laboral de ingresos (Anexo 6).
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Stack spacing={1}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      disabled={uploadingImagenAnexo3}
+                      startIcon={uploadingImagenAnexo3 ? <CircularProgress size={20} /> : (imagenAnexo3Url ? <CheckCircleIcon /> : <UploadFileIcon />)}
+                      color={imagenAnexo3Url ? 'success' : 'primary'}
+                    >
+                      {uploadingImagenAnexo3 ? 'Subiendo...' : (imagenAnexo3Url ? 'Anexo 3 subido' : 'Subir imagen Anexo 3 (Inventario)')}
+                      <input type="file" accept="image/*" hidden onChange={handleImagenAnexoChange('bienesInventarioImagen', setUploadingImagenAnexo3)} />
+                    </Button>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {imagenAnexo3Name || (imagenAnexo3Url ? "Imagen cargada" : 'Sin imagen (Opcional)')}
+                    </Typography>
+                    {imagenAnexo3Url && (
+                      <Box
+                        component="img"
+                        src={imagenAnexo3Url}
+                        alt="Inventario de bienes"
+                        sx={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: '12px', border: `1px solid ${alpha(theme.palette.divider, 0.2)}` }}
+                      />
+                    )}
+                  </Stack>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Stack spacing={1}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      disabled={uploadingImagenAnexo6}
+                      startIcon={uploadingImagenAnexo6 ? <CircularProgress size={20} /> : (imagenAnexo6Url ? <CheckCircleIcon /> : <UploadFileIcon />)}
+                      color={imagenAnexo6Url ? 'success' : 'primary'}
+                    >
+                      {uploadingImagenAnexo6 ? 'Subiendo...' : (imagenAnexo6Url ? 'Anexo 6 subido' : 'Subir imagen Anexo 6 (Cert. Laboral)')}
+                      <input type="file" accept="image/*" hidden onChange={handleImagenAnexoChange('certificacionLaboralImagen', setUploadingImagenAnexo6)} />
+                    </Button>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {imagenAnexo6Name || (imagenAnexo6Url ? "Imagen cargada" : 'Sin imagen (Opcional)')}
+                    </Typography>
+                    {imagenAnexo6Url && (
+                      <Box
+                        component="img"
+                        src={imagenAnexo6Url}
+                        alt="Certificación laboral"
+                        sx={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: '12px', border: `1px solid ${alpha(theme.palette.divider, 0.2)}` }}
+                      />
+                    )}
+                  </Stack>
+                </Grid>
+              </Grid>
             </Stack>
           </GlassCard>
 
@@ -1322,6 +2237,112 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
               </Button>
             </Stack>
           </GlassCard>
+
+          <GlassCard sx={{ p: 3, mt: 3 }}>
+            <Stack spacing={3}>
+              <Typography variant="h6">Firma del Deudor</Typography>
+              <FormControl component="fieldset" fullWidth>
+                <RadioGroup row value={signatureSourceDeudor} onChange={(e) => {
+                  const newSource = e.target.value;
+                  setSignatureSourceDeudor(newSource);
+                  setValue('firmaDeudor.source', newSource);
+                  setValue('firmaDeudor.data', null);
+                  setValue('firmaDeudor.file', null);
+                  setValue('firmaDeudor.url', null);
+                  if (sigCanvasDeudor.current) sigCanvasDeudor.current.clear();
+                  setSignatureImageDeudor(null);
+                }}>
+                  <FormControlLabel value="draw" control={<Radio />} label="Dibujar Firma" />
+                  <FormControlLabel value="upload" control={<Radio />} label="Subir Imagen de Firma" />
+                </RadioGroup>
+              </FormControl>
+
+              {signatureSourceDeudor === 'draw' && (
+                <Stack spacing={1}>
+                  <Box
+                    ref={signatureContainerDeudorRef}
+                    sx={{
+                      border: '1px dashed grey',
+                      borderRadius: '12px',
+                      p: 1,
+                      background: 'white',
+                      width: '100%',
+                      height: 200,
+                      cursor: 'crosshair'
+                    }}
+                  >
+                    <SignatureCanvas
+                      ref={sigCanvasDeudor}
+                      penColor='black'
+                      canvasProps={{
+                        width: deudorCanvasSize.width,
+                        height: deudorCanvasSize.height,
+                        style: { background: '#f8f8f8', borderRadius: '12px' }
+                      }}
+                      onEnd={() => setValue('firmaDeudor.data', sigCanvasDeudor.current.getTrimmedCanvas().toDataURL('image/png'))}
+                    />
+                  </Box>
+                  <Button
+                    variant="text"
+                    onClick={() => {
+                      if (sigCanvasDeudor.current) {
+                        sigCanvasDeudor.current.clear();
+                        setValue('firmaDeudor.data', null);
+                      }
+                    }}
+                    sx={{ alignSelf: 'flex-start' }}
+                  >
+                    Limpiar
+                  </Button>
+                </Stack>
+              )}
+
+              {signatureSourceDeudor === 'upload' && (
+                <Box>
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<UploadFileIcon />}
+                  >
+                    Seleccionar Archivo
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={handleSignatureDeudorFileUpload}
+                    />
+                  </Button>
+                  {signatureImageDeudor && (
+                    <Box mt={2}>
+                      <Typography>Vista Previa:</Typography>
+                      <img src={signatureImageDeudor} alt="Firma del Deudor" style={{ maxWidth: '100%', maxHeight: 200, border: '1px solid #ccc' }} />
+                    </Box>
+                  )}
+                  <Controller
+                    name="firmaDeudor.file"
+                    control={control}
+                    rules={{
+                      validate: (value) => {
+                        const currentUrl = watch('firmaDeudor.url');
+                        return signatureSourceDeudor !== 'upload' || value instanceof File || currentUrl ? true : 'Debe seleccionar una imagen de firma.';
+                      }
+                    }}
+                    render={({ fieldState }) => fieldState.error && <FormHelperText error>{fieldState.error.message}</FormHelperText>}
+                  />
+                </Box>
+              )}
+
+              <Button
+                variant="contained"
+                onClick={() => handleSaveSection('firma')}
+                disabled={isSaving || savedSections.firma}
+                startIcon={<SaveIcon />}
+                sx={{ mt: 2 }}
+              >
+                {savedSections.firma ? 'Firma Guardada' : 'Guardar Firma'}
+              </Button>
+            </Stack>
+          </GlassCard>
         </TabPanel>
       </form>
 
@@ -1396,6 +2417,198 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         onConfirm={handleDescriptionConfirm}
         defaultValue={currentFileToProcess?.name || ''}
       />
+
+      <Dialog
+        open={isAcreenciasModalOpen}
+        onClose={() => setIsAcreenciasModalOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.9)} 100%)`,
+            backdropFilter: 'blur(40px) saturate(180%)',
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+            borderRadius: 4,
+            boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.37)}`,
+            overflow: 'hidden',
+          }
+        }}
+        BackdropProps={{
+          sx: {
+            backdropFilter: 'blur(8px)',
+            backgroundColor: alpha(theme.palette.common.black, 0.5),
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            background: `linear-gradient(135deg, ${alpha(tabsConfig[3].color, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.08)} 100%)`,
+            py: 3,
+          }}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: alpha(tabsConfig[3].color, 0.1), color: tabsConfig[3].color }}>
+                <AccountBalanceIcon />
+              </Avatar>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                Relación de Acreencias
+              </Typography>
+            </Stack>
+            <IconButton onClick={() => setIsAcreenciasModalOpen(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Stack spacing={3}>
+            {(acreenciasValues || []).length === 0 ? (
+              <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                <WarningIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                <Typography variant="body1">
+                  No hay acreencias agregadas.
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, color: tabsConfig[3].color }}>
+                    Resumen de las Acreencias
+                  </Typography>
+                  <TableContainer sx={{ maxHeight: 400 }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell><b>Acreedores</b></TableCell>
+                          <TableCell align="right"><b>Capital</b></TableCell>
+                          <TableCell align="center"><b>Quórum</b></TableCell>
+                          <TableCell align="right"><b>Interés Corriente</b></TableCell>
+                          <TableCell align="right"><b>Interés de Mora</b></TableCell>
+                          <TableCell align="center"><b>Días en Mora</b></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {acreenciasPreview.clasesConDatos.map(className => {
+                          const items = acreenciasPreview.grouped[className];
+                          const classCapital = items.reduce((s, a) => s + (Number(a.capital) || 0), 0);
+                          const classInteresCorriente = items.reduce((s, a) => s + (Number(a.valorTotalInteresCorriente) || 0), 0);
+                          const classInteresMoratorio = items.reduce((s, a) => s + (Number(a.valorTotalInteresMoratorio) || 0), 0);
+                          const classPorcentaje = (acreenciasPreview.total > 0) ? `${((classCapital / acreenciasPreview.total) * 100).toFixed(2)}%` : '0.00%';
+                          return (
+                            <React.Fragment key={className}>
+                              <TableRow>
+                                <TableCell colSpan={6} sx={{ background: alpha(tabsConfig[3].color, 0.05), fontWeight: 700 }}>
+                                  {className}
+                                </TableCell>
+                              </TableRow>
+                              {items.map((a, i) => {
+                                const cap = Number(a.capital) || 0;
+                                const porc = (acreenciasPreview.total > 0) ? `${((cap / acreenciasPreview.total) * 100).toFixed(2)}%` : '0.00%';
+                                let diasMora = '';
+                                if (a.creditoEnMora) {
+                                  diasMora = a.moraMas90Dias ? 'Más de 90 días' : `${a.diasDeMora || '?'} días`;
+                                }
+                                return (
+                                  <TableRow key={i}>
+                                    <TableCell>{getAcreedorNombre(a)}</TableCell>
+                                    <TableCell align="right">{formatMoney(cap)}</TableCell>
+                                    <TableCell align="center">{porc}</TableCell>
+                                    <TableCell align="right">{formatMoney(a.valorTotalInteresCorriente)}</TableCell>
+                                    <TableCell align="right">{formatMoney(a.valorTotalInteresMoratorio)}</TableCell>
+                                    <TableCell align="center">{diasMora}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 700 }}>TOTAL ACREENCIAS {className}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney(classCapital)}</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 700 }}>{classPorcentaje}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney(classInteresCorriente)}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney(classInteresMoratorio)}</TableCell>
+                                <TableCell />
+                              </TableRow>
+                            </React.Fragment>
+                          );
+                        })}
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>TOTAL ACREENCIAS</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney(acreenciasPreview.total)}</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700 }}>100.00%</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney((acreenciasValues || []).reduce((s, a) => s + (Number(a.valorTotalInteresCorriente) || 0), 0))}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney((acreenciasValues || []).reduce((s, a) => s + (Number(a.valorTotalInteresMoratorio) || 0), 0))}</TableCell>
+                          <TableCell />
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, color: tabsConfig[3].color }}>
+                    Detalle de las Acreencias
+                  </Typography>
+                  <Stack spacing={2}>
+                    {(acreenciasValues || []).map((a, idx) => (
+                      <TableContainer key={idx}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell colSpan={2} align="center" sx={{ background: alpha(tabsConfig[3].color, 0.08), fontWeight: 700 }}>
+                                Acreencia No. {idx + 1}
+                              </TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {[
+                              ['Nombre', getAcreedorNombre(a)],
+                              ['Tipo de Documento', getAcreedorData(a)?.tipoDoc || 'No reporta'],
+                              ['No. de Documento', getAcreedorData(a)?.nitCc || getAcreedorData(a)?.nit || a.documento || 'No reporta'],
+                              ['Dirección de notificación judicial', getAcreedorData(a)?.direccion || a.direccion || 'No reporta'],
+                              ['País', getAcreedorData(a)?.pais || 'Colombia'],
+                              ['Departamento', getAcreedorData(a)?.departamento || a.departamento || 'No reporta'],
+                              ['Ciudad', getAcreedorData(a)?.ciudad || a.ciudad || 'No reporta'],
+                              ['Dirección de notificación electrónica', getAcreedorData(a)?.email || a.email || 'No reporta'],
+                              ['Teléfono', getAcreedorData(a)?.telefono || a.telefono || 'No reporta'],
+                              ['Tipo de Acreencia', a.tipoAcreencia || 'No reporta'],
+                              ['Naturaleza del crédito', a.naturalezaCredito || 'No reporta'],
+                              ['Crédito en condición de legalmente postergado (Artículo 572A, Causal 1)', a.creditoPostergado ? 'SI' : 'NO'],
+                              ['Descripción del crédito', a.descripcionCredito || 'No reporta'],
+                              ['Valor en capital', formatMoney(a.capital)],
+                              ['Valor en interés corriente', Number(a.valorTotalInteresCorriente) > 0 ? formatMoney(a.valorTotalInteresCorriente) : 'Se desconoce esta información'],
+                              ['Tasa de interés corriente', a.tasaInteresCorriente || 'No reporta'],
+                              ['Tipo de interés corriente', a.tipoInteresCorriente || 'No reporta'],
+                              ['Cuantía total de la obligación', formatMoney((Number(a.capital || 0) + Number(a.valorTotalInteresCorriente || 0) + Number(a.valorTotalInteresMoratorio || 0)))],
+                              ['¿El pago del crédito se está realizando mediante libranza o cualquier otro tipo de descuento por nómina?', a.pagoPorLibranza ? 'SI' : 'NO'],
+                              ['Número de días en mora', a.creditoEnMora ? (a.moraMas90Dias ? 'Más de 90 días' : `${a.diasDeMora || '?'} días`) : ''],
+                              ['Más de 90 días en mora', a.moraMas90Dias ? 'SI' : 'NO'],
+                              ['Valor en interés moratorio', Number(a.valorTotalInteresMoratorio) > 0 ? formatMoney(a.valorTotalInteresMoratorio) : 'Se desconoce esta información'],
+                              ['Tasa de interés moratorio', a.tasaInteresMoratorio || 'No reporta'],
+                              ['Tipo de interés moratorio', a.tipoInteresMoratorio || 'No reporta'],
+                              ['Fecha de otorgamiento', a.fechaOtorgamiento ? `${new Date(a.fechaOtorgamiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}.` : 'Se desconoce esta información.'],
+                              ['Fecha de vencimiento', a.fechaVencimiento ? `${new Date(a.fechaVencimiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}.` : 'Se desconoce esta información.'],
+                            ].map((row, ri) => (
+                              <TableRow key={ri}>
+                                <TableCell sx={{ width: '50%', fontWeight: 600 }}>{row[0]}</TableCell>
+                                <TableCell sx={{ width: '50%' }}>{row[1]}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ))}
+                  </Stack>
+                </Box>
+              </>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+          <Button onClick={() => setIsAcreenciasModalOpen(false)} color="primary" variant="contained" sx={{ borderRadius: '12px' }}>
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

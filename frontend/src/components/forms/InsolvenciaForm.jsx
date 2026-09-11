@@ -311,6 +311,31 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         background: 'rgba(255, 255, 255, 0.15)',
     },
   };
+
+  const menuProps = {
+    PaperProps: {
+      sx: {
+        backgroundColor: alpha(theme.palette.background.paper, 0.9),
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${alpha('#fff', 0.1)}`,
+        borderRadius: '12px',
+        maxHeight: 300,
+        '& .MuiMenuItem-root': {
+          padding: '10px 16px',
+          '&:hover': {
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+          },
+          '&.Mui-selected': {
+            backgroundColor: alpha(theme.palette.primary.main, 0.2),
+            '&:hover': {
+              backgroundColor: alpha(theme.palette.primary.main, 0.3),
+            },
+          },
+        },
+      },
+    },
+  };
+
   const { register, control, handleSubmit, watch, setValue, getValues, trigger, formState: { errors }, reset, setError, clearErrors } = useForm({
     defaultValues: {
       deudor: {},
@@ -363,6 +388,8 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadingAnexos, setUploadingAnexos] = useState({});
   const [isConfirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [isAcreenciasModalOpen, setIsAcreenciasModalOpen] = useState(false);
+
   const sigCanvas = React.useRef({});
 
   // Watcher for firma.source to keep state in sync
@@ -744,6 +771,48 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     pasivoEnMoraSuperior30Pct: porcentajeMora > 30,
   };
   const cumpleRequisitos = validacionInsolvencia.dosOMasObligaciones && validacionInsolvencia.hayCreditosEnMora && validacionInsolvencia.pasivoEnMoraSuperior30Pct;
+
+   const getClassFromNaturaleza = (naturaleza) => {
+    if (!naturaleza) return 'QUINTA CLASE';
+    if (naturaleza.toUpperCase().includes('PRIMERA CLASE')) return 'PRIMERA CLASE';
+    if (naturaleza.toUpperCase().includes('SEGUNDA CLASE')) return 'SEGUNDA CLASE';
+    if (naturaleza.toUpperCase().includes('TERCERA CLASE')) return 'TERCERA CLASE';
+    if (naturaleza.toUpperCase().includes('CUARTA CLASE')) return 'CUARTA CLASE';
+    return 'QUINTA CLASE';
+  };
+  
+   const formatMoney = (num) => {
+    const value = Number(num) || 0;
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  };
+
+  const getAcreedorData = (a) => {
+    if (!a) return null;
+    if (a.acreedor && typeof a.acreedor === 'object' && a.acreedor._id) return a.acreedor;
+    const found = acreedoresData?.rows?.find(ac => ac._id === a.acreedor);
+    return found || null;
+  };
+
+  const getAcreedorNombre = (a) => {
+    const ac = getAcreedorData(a);
+    if (ac) return ac.nombre;
+    if (!a) return 'No reporta';
+    if (typeof a.acreedor === 'string' && a.acreedor) return a.acreedor;
+    return 'No reporta';
+  };
+
+  const acreenciasPreview = (() => {
+    const lista = watchedAcreencias || [];
+    const clases = ['PRIMERA CLASE', 'SEGUNDA CLASE', 'TERCERA CLASE', 'CUARTA CLASE', 'QUINTA CLASE'];
+    const grouped = lista.reduce((acc, a) => {
+      const cls = getClassFromNaturaleza(a.naturalezaCredito);
+      if (!acc[cls]) acc[cls] = [];
+      acc[cls].push(a);
+      return acc;
+    }, {});
+    const clasesConDatos = clases.filter(cls => grouped[cls] && grouped[cls].length > 0);
+    return { grouped, clasesConDatos, total: totalCapital };
+  })();
 
   const totalGastos = [
     'alimentacion', 'salud', 'arriendo', 'serviciosPublicos', 'educacion',
@@ -2193,14 +2262,7 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                                             {...field}
                                             label="Naturaleza del Crédito"
                                             sx={selectSx}
-                                            MenuProps={{
-                                              PaperProps: {
-                                                style: {
-                                                  backgroundColor: '#ffffff',
-                                                  height: 300,
-                                                },
-                                              },
-                                            }}
+                                            MenuProps={menuProps}
                                           >
                                             <MenuItem value="Primera Clase: Alimentos de Menores">Primera Clase: Alimentos de Menores</MenuItem>
                                             <MenuItem value="Primera Clase: Obligaciones Laborales">Primera Clase: Obligaciones Laborales</MenuItem>
@@ -2340,6 +2402,14 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                                             <Checkbox
                                               {...field}
                                               checked={field.value}
+                                              onChange={(e) => {
+                                                const isChecked = e.target.checked;
+                                                field.onChange(isChecked);
+                                                if (isChecked) {
+                                                  setValue(`acreencias.${index}.moraMas90Dias`, true);
+                                                  setValue(`acreencias.${index}.diasDeMora`, '');
+                                                }
+                                              }}
                                             />
                                           }
                                           label="¿El crédito esta en mora?"
@@ -2564,6 +2634,27 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                     })}
                   </Stack>
                 )}
+
+                {/* Vista previa de Acreencias */}
+                <Stack direction="row" justifyContent="flex-end">
+                  <Button
+                    variant="contained"
+                    onClick={() => setIsAcreenciasModalOpen(true)}
+                    startIcon={<AccountBalanceIcon />}
+                    sx={{
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      background: `linear-gradient(135deg, ${tabsConfig[3].color}, ${alpha(tabsConfig[3].color, 0.7)})`,
+                      '&:hover': {
+                        background: `linear-gradient(135deg, ${alpha(tabsConfig[3].color, 0.9)}, ${alpha(tabsConfig[3].color, 0.6)})`,
+                        transform: 'translateY(-2px)',
+                      },
+                    }}
+                  >
+                    Ver Relación de Acreencias
+                  </Button>
+                </Stack>
 
                 {/* Análisis de Requisitos */}
                 <GlassCard
@@ -4513,6 +4604,198 @@ const InsolvenciaForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                 onConfirm={handleDescriptionConfirm}
                 defaultValue={currentFileToProcess?.name || ''} // Optional: pre-fill with filename
               />
+
+              {/* Modal de Relación de Acreencias */}
+              <Dialog
+                open={isAcreenciasModalOpen}
+                onClose={() => setIsAcreenciasModalOpen(false)}
+                maxWidth="lg"
+                fullWidth
+                PaperProps={{
+                  sx: {
+                    background: `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.9)} 100%)`,
+                    backdropFilter: 'blur(40px) saturate(180%)',
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                    borderRadius: 4,
+                    boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.37)}`,
+                    overflow: 'hidden',
+                  }
+                }}
+                BackdropProps={{
+                  sx: {
+                    backdropFilter: 'blur(8px)',
+                    backgroundColor: alpha(theme.palette.common.black, 0.5),
+                  }
+                }}
+              >
+                <DialogTitle
+                  sx={{
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    background: `linear-gradient(135deg, ${alpha(tabsConfig[3].color, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.08)} 100%)`,
+                    py: 3,
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Avatar sx={{ bgcolor: alpha(tabsConfig[3].color, 0.1), color: tabsConfig[3].color }}>
+                        <AccountBalanceIcon />
+                      </Avatar>
+                      <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                        Relación de Acreencias
+                      </Typography>
+                    </Stack>
+                    <IconButton onClick={() => setIsAcreenciasModalOpen(false)}>
+                      <CloseIcon />
+                    </IconButton>
+                  </Stack>
+                </DialogTitle>
+                <DialogContent sx={{ p: 3 }}>
+                  <Stack spacing={3}>
+                    {(watchedAcreencias || []).length === 0 ? (
+                      <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                        <WarningIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                        <Typography variant="body1">
+                          No hay acreencias agregadas.
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <>
+                        {/* Resumen de Acreencias */}
+                        <Box>
+                          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, color: tabsConfig[3].color }}>
+                            Resumen de las Acreencias
+                          </Typography>
+                          <TableContainer sx={{ maxHeight: 400 }}>
+                            <Table size="small" stickyHeader>
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell><b>Acreedores</b></TableCell>
+                                  <TableCell align="right"><b>Capital</b></TableCell>
+                                  <TableCell align="center"><b>Quórum</b></TableCell>
+                                  <TableCell align="right"><b>Interés Corriente</b></TableCell>
+                                  <TableCell align="right"><b>Interés de Mora</b></TableCell>
+                                  <TableCell align="center"><b>Días en Mora</b></TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {acreenciasPreview.clasesConDatos.map(className => {
+                                  const items = acreenciasPreview.grouped[className];
+                                  const classCapital = items.reduce((s, a) => s + (Number(a.capital) || 0), 0);
+                                  const classInteresCorriente = items.reduce((s, a) => s + (Number(a.valorTotalInteresCorriente) || 0), 0);
+                                  const classInteresMoratorio = items.reduce((s, a) => s + (Number(a.valorTotalInteresMoratorio) || 0), 0);
+                                  const classPorcentaje = (acreenciasPreview.total > 0) ? `${((classCapital / acreenciasPreview.total) * 100).toFixed(2)}%` : '0.00%';
+                                  return (
+                                    <React.Fragment key={className}>
+                                      <TableRow>
+                                        <TableCell colSpan={6} sx={{ background: alpha(tabsConfig[3].color, 0.05), fontWeight: 700 }}>
+                                          {className}
+                                        </TableCell>
+                                      </TableRow>
+                                      {items.map((a, i) => {
+                                        const cap = Number(a.capital) || 0;
+                                        const porc = (acreenciasPreview.total > 0) ? `${((cap / acreenciasPreview.total) * 100).toFixed(2)}%` : '0.00%';
+                                        const diasMora = a.creditoEnMora ? 'Más de 90 días.' : '';
+                                        return (
+                                          <TableRow key={i}>
+                                            <TableCell>{getAcreedorNombre(a)}</TableCell>
+                                            <TableCell align="right">{formatMoney(cap)}</TableCell>
+                                            <TableCell align="center">{porc}</TableCell>
+                                            <TableCell align="right">{formatMoney(a.valorTotalInteresCorriente)}</TableCell>
+                                            <TableCell align="right">{formatMoney(a.valorTotalInteresMoratorio)}</TableCell>
+                                            <TableCell align="center">{diasMora}</TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                      <TableRow>
+                                        <TableCell sx={{ fontWeight: 700 }}>TOTAL ACREENCIAS {className}</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney(classCapital)}</TableCell>
+                                        <TableCell align="center" sx={{ fontWeight: 700 }}>{classPorcentaje}</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney(classInteresCorriente)}</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney(classInteresMoratorio)}</TableCell>
+                                        <TableCell />
+                                      </TableRow>
+                                    </React.Fragment>
+                                  );
+                                })}
+                                <TableRow>
+                                  <TableCell sx={{ fontWeight: 700 }}>TOTAL ACREENCIAS</TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney(acreenciasPreview.total)}</TableCell>
+                                  <TableCell align="center" sx={{ fontWeight: 700 }}>100.00%</TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney((watchedAcreencias || []).reduce((s, a) => s + (Number(a.valorTotalInteresCorriente) || 0), 0))}</TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 700 }}>{formatMoney((watchedAcreencias || []).reduce((s, a) => s + (Number(a.valorTotalInteresMoratorio) || 0), 0))}</TableCell>
+                                  <TableCell />
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </Box>
+
+                        {/* Detalle de cada Acreencia */}
+                        <Box>
+                          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, color: tabsConfig[3].color }}>
+                            Detalle de las Acreencias
+                          </Typography>
+                          <Stack spacing={2}>
+                            {(watchedAcreencias || []).map((a, idx) => (
+                              <TableContainer key={idx}>
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell colSpan={2} align="center" sx={{ background: alpha(tabsConfig[3].color, 0.08), fontWeight: 700 }}>
+                                        Acreencia No. {idx + 1}
+                                      </TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {[
+                                      ['Nombre', getAcreedorNombre(a)],
+                                      ['Tipo de Documento', getAcreedorData(a)?.tipoDoc || 'No reporta'],
+                                      ['No. de Documento', getAcreedorData(a)?.nitCc || getAcreedorData(a)?.nit || a.documento || 'No reporta'],
+                                      ['Dirección de notificación judicial', getAcreedorData(a)?.direccion || a.direccion || 'No reporta'],
+                                      ['País', getAcreedorData(a)?.pais || 'Colombia'],
+                                      ['Departamento', getAcreedorData(a)?.departamento || a.departamento || 'No reporta'],
+                                      ['Ciudad', getAcreedorData(a)?.ciudad || a.ciudad || 'No reporta'],
+                                      ['Dirección de notificación electrónica', getAcreedorData(a)?.email || a.email || 'No reporta'],
+                                      ['Teléfono', getAcreedorData(a)?.telefono || a.telefono || 'No reporta'],
+                                      ['Tipo de Acreencia', a.tipoAcreencia || 'No reporta'],
+                                      ['Naturaleza del crédito', a.naturalezaCredito || 'No reporta'],
+                                      ['Crédito en condición de legalmente postergado (Artículo 572A, Causal 1)', a.creditoPostergado ? 'SI' : 'NO'],
+                                      ['Descripción del crédito', a.descripcionCredito || 'No reporta'],
+                                      ['Valor en capital', formatMoney(a.capital)],
+                                      ['Valor en interés corriente', Number(a.valorTotalInteresCorriente) > 0 ? formatMoney(a.valorTotalInteresCorriente) : 'Se desconoce esta información'],
+                                      ['Tasa de interés corriente', a.tasaInteresCorriente || 'No reporta'],
+                                      ['Tipo de interés corriente', a.tipoInteresCorriente || 'No reporta'],
+                                      ['Cuantía total de la obligación', formatMoney((Number(a.capital || 0) + Number(a.valorTotalInteresCorriente || 0) + Number(a.valorTotalInteresMoratorio || 0)))],
+                                      ['¿El pago del crédito se está realizando mediante libranza o cualquier otro tipo de descuento por nómina?', a.pagoPorLibranza ? 'SI' : 'NO'],
+                                      ['Número de días en mora', a.creditoEnMora ? 'Más de 90 días' : ''],
+                                      ['Más de 90 días en mora', a.creditoEnMora ? 'SI' : 'No'],
+                                      ['Valor en interés moratorio', Number(a.valorTotalInteresMoratorio) > 0 ? formatMoney(a.valorTotalInteresMoratorio) : 'Se desconoce esta información'],
+                                      ['Tasa de interés moratorio', a.tasaInteresMoratorio || 'No reporta'],
+                                      ['Tipo de interés moratorio', a.tipoInteresMoratorio || 'No reporta'],
+                                      ['Fecha de otorgamiento', a.fechaOtorgamiento ? `${new Date(a.fechaOtorgamiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}.` : 'Se desconoce esta información.'],
+                                      ['Fecha de vencimiento', a.fechaVencimiento ? `${new Date(a.fechaVencimiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}.` : 'Se desconoce esta información.'],
+                                    ].map((row, ri) => (
+                                      <TableRow key={ri}>
+                                        <TableCell sx={{ width: '50%', fontWeight: 600 }}>{row[0]}</TableCell>
+                                        <TableCell sx={{ width: '50%' }}>{row[1]}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            ))}
+                          </Stack>
+                        </Box>
+                      </>
+                    )}
+                  </Stack>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                  <Button onClick={() => setIsAcreenciasModalOpen(false)} color="primary" variant="contained" sx={{ borderRadius: '12px' }}>
+                    Cerrar
+                  </Button>
+                </DialogActions>
+              </Dialog>
           </Box>
         );
       };

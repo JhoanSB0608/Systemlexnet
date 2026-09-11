@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { createLiquidacion, getLiquidacionDocumento, getLiquidacionById, updateLiquidacion, getMisLiquidaciones, saveBorrador, updateBorrador, deleteBorrador } = require('../controllers/liquidacionController.js');
+const { createLiquidacion, getLiquidacionDocumento, getLiquidacionAnexos, getLiquidacionById, updateLiquidacion, getMisLiquidaciones, saveBorrador, updateBorrador, deleteBorrador } = require('../controllers/liquidacionController.js');
 const { protect } = require('../middleware/authMiddleware.js');
 
 // Multer config for file uploads
@@ -44,5 +44,7 @@ router.route('/:id')
   .put(protect, uploadFields, updateLiquidacion);
 
 router.route('/:id/documento').get(protect, getLiquidacionDocumento);
+
+router.route('/:id/anexos').get(protect, getLiquidacionAnexos);
 
 module.exports = router;

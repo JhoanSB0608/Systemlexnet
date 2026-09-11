@@ -221,9 +221,22 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
   const ingresos = Number(informacionFinanciera.ingresosMensuales) || 0;
   const gastos = Number(informacionFinanciera.gastosMensuales) || 0;
   const capacidad = Number(informacionFinanciera.capacidadPago) || 0;
-  const numObligaciones = Number(informacionFinanciera.numeroObligaciones) || 0;
-  const numAcreedores = Number(informacionFinanciera.numeroAcreedores) || 0;
-  const porcPasivo = Number(informacionFinanciera.porcentajePasivo) || 0;
+
+  // Las obligaciones se derivan de las acreencias marcadas como en mora por más
+  // de 90 días. Si no hay ninguna marcada se conservan los valores autorreportados.
+  const obligacionesEnMora = (acreencias || []).filter(
+    (a) => a.creditoEnMora === true && a.moraMas90Dias === true
+  );
+  const capitalObligaciones = obligacionesEnMora.reduce((s, a) => s + (Number(a.capital) || 0), 0);
+  const numObligaciones = obligacionesEnMora.length || Number(informacionFinanciera.numeroObligaciones) || 0;
+  const numAcreedores = new Set(
+    obligacionesEnMora
+      .map((a) => (a.acreedor && (a.acreedor._id || a.acreedor)) || a.nombreAcreedor)
+      .filter(Boolean)
+  ).size || Number(informacionFinanciera.numeroAcreedores) || 0;
+  const porcPasivo = (obligacionesEnMora.length > 0 && totalCapital > 0)
+    ? Math.round((capitalObligaciones / totalCapital) * 1000) / 10
+    : (Number(informacionFinanciera.porcentajePasivo) || 0);
 
   const tituloJuzgado = safe(sede.juzgado) || 'JUEZ CIVIL MUNICIPAL (REPARTO)';
   const nombreApoderado = safe(apoderado.nombreCompleto).toUpperCase();
@@ -765,4 +778,14 @@ async function generateLiquidacionPdf(solicitud = {}, baseUrl = '') {
   });
 }
 
-module.exports = { generateLiquidacionPdf, buildLiquidacionDocDefinition };
+module.exports = {
+  generateLiquidacionPdf,
+  buildLiquidacionDocDefinition,
+  fetchUrlToDataUrl,
+  loadFirmaImages,
+  safe,
+  formatCifra,
+  letrasMoneda,
+  nombreCompletoDeudor,
+  identificacionDeudor,
+};

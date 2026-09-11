@@ -63,6 +63,35 @@ export const downloadLiquidacionDocument = async (solicitudId, format = 'pdf') =
 };
 
 
+export const downloadLiquidacionAnexos = async (solicitudId) => {
+  try {
+    const config = getConfig({ responseType: 'blob' });
+    const response = await axios.get(`${API_URL}/${solicitudId}/anexos`, config);
+
+    const contentType = (response.headers['content-type'] || '').toLowerCase();
+    if (contentType.includes('application/json')) {
+      const text = await response.data.text();
+      let errObj = { message: 'Error desconocido en servidor' };
+      try { errObj = JSON.parse(text); } catch(e) {}
+      throw errObj;
+    }
+
+    let filename = `anexos-liquidacion-${solicitudId}.pdf`;
+    const cd = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+    if (cd) {
+      const match = cd.match(/filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/);
+      if (match) filename = decodeURIComponent(match[1] || match[2] || match[3]);
+    }
+
+    saveAs(response.data, filename);
+    return true;
+  } catch (error) {
+    console.error('Error al descargar los anexos de liquidación', error);
+    throw error.response?.data || { message: error.message || 'Error descargando los anexos' };
+  }
+};
+
+
 export const getLiquidacionById = async (solicitudId) => {
   try {
     const config = getConfig();
@@ -85,6 +114,6 @@ export const updateLiquidacion = async (solicitudId, payload) => {
   }
 };
 
-const liquidacionService = { createLiquidacion, downloadLiquidacionDocument, getLiquidacionById, updateLiquidacion };
+const liquidacionService = { createLiquidacion, downloadLiquidacionDocument, downloadLiquidacionAnexos, getLiquidacionById, updateLiquidacion };
 
 export default liquidacionService;
