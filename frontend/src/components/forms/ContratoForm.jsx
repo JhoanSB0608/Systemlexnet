@@ -600,7 +600,7 @@ const ContratoForm = ({ onSubmit, isUploading, initialData, isUpdating }) => {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}><GlassTextField {...register('siniestro.fecha', { required: 'Requerido' })} label="Fecha del Accidente" type="date" InputLabelProps={{ shrink: true }} fullWidth error={!!errors.siniestro?.fecha} helperText={errors.siniestro?.fecha?.message} /></Grid>
               <Grid item xs={12} sm={6}><GlassTextField {...register('siniestro.victimaNombre')} label="Nombre de la Víctima (si no se digita, se usa el comitente)" fullWidth /></Grid>
-              <Grid item xs={12} sm={6}><GlassTextField {...register('siniestro.porcentaje', { required: 'Requerido' })} label="Porcentaje de Honores (Ej: 25)" fullWidth error={!!errors.siniestro?.porcentaje} helperText={errors.siniestro?.porcentaje?.message} /></Grid>
+              <Grid item xs={12} sm={6}><GlassTextField {...register('siniestro.porcentaje', { required: 'Requerido' })} label="Porcentaje de Honorarios (Ej: 25)" fullWidth error={!!errors.siniestro?.porcentaje} helperText={errors.siniestro?.porcentaje?.message} /></Grid>
               <Grid item xs={12} sm={6}><GlassTextField {...register('siniestro.porcentajeLetras')} label="Porcentaje en Letras (Ej: veinticinco)" fullWidth /></Grid>
             </Grid>
             <Button variant="contained" onClick={() => handleSaveSection('siniestro', 2)} disabled={isSaving} startIcon={isSaving ? null : <SaveIcon />}>

@@ -1741,7 +1741,7 @@ const PoderesTable = ({ rows, totalRows, isLoading, page, rowsPerPage, onPageCha
 
 const ContratosTable = ({ rows, totalRows, isLoading, page, rowsPerPage, onPageChange, onRowsPerPageChange, onDownloadContrato, onEditContrato }) => {
   const theme = useTheme();
-  const headCells = ['Fecha', 'Usuario', 'Comitente', 'Abogado', 'Honores', 'Estado', 'Acciones'];
+  const headCells = ['Fecha', 'Usuario', 'Comitente', 'Abogado', 'Honorarios', 'Estado', 'Acciones'];
 
   return (
     <GlassCard>
