@@ -11,6 +11,9 @@ const {
   letrasMoneda,
   nombreCompletoDeudor,
   identificacionDeudor,
+  esFemenino,
+  suscrito,
+  identificado,
 } = require('./LiquidacionDocumentGenerator');
 
 // ---------------------------------------------------------------------------
@@ -146,7 +149,7 @@ function firmaDeudorBloque(deudor = {}, firmaDeudor) {
   }
   stack.push({ text: nombreCompletoDeudor(deudor), bold: true, fontSize: 11, margin: [0, 0, 0, 2] });
   stack.push({
-    text: `Identificado con Cédula de Ciudadanía No. ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`,
+    text: `${identificado(deudor.genero).replace(/^./, (c) => c.toUpperCase())} con Cédula de Ciudadanía No. ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`,
     fontSize: 11,
     margin: [0, 0, 0, 10],
   });
@@ -373,7 +376,7 @@ function buildAnexosDocDefinition(solicitud = {}) {
   // ============ ANEXO 2 ============
   c.push(tituloAnexo(2, 'CAUSAS QUE ME LLEVARON AL PROCESO DE INSOLVENCIA'));
   c.push(parrafo(
-    `El suscrito, ${deudorIntro} actuando en nombre propio, de conformidad con el articulo 539 numeral 2 Ley 1564 de 2012, por medio del presente doy a conocer las causas que me sumergieron en la situación de insolvencia, en la que me encuentro tal y como se detallan a continuación.`
+    `${suscrito(deudor.genero)}, ${deudorIntro} actuando en nombre propio, de conformidad con el articulo 539 numeral 2 Ley 1564 de 2012, por medio del presente doy a conocer las causas que me sumergieron en la situación de insolvencia, en la que me encuentro tal y como se detallan a continuación.`
   ));
   c.push(parrafo(
     'Soy una persona natural no comerciante, actualmente me encuentro en una grave situación económica, debido al sobreendeudamiento y al inadecuado uso de mi economía que sobre pasó mi capacidad de pago, adicional la mala administración de mis recursos económicos.'
@@ -393,7 +396,7 @@ function buildAnexosDocDefinition(solicitud = {}) {
   // ============ ANEXO 3 ============
   c.push(tituloAnexo(3, 'RELACIÓN E INVENTARIO DE LOS BIENES MUEBLES E INMUEBLES'));
   c.push(parrafo(
-    `El suscrito, ${deudorIntro} actuando en nombre propio certifico bajo la gravedad de juramento que no poseo bienes muebles o inmuebles para adjudicar.`
+    `${suscrito(deudor.genero)}, ${deudorIntro} actuando en nombre propio certifico bajo la gravedad de juramento que no poseo bienes muebles o inmuebles para adjudicar.`
   ));
   c.push(parrafo('Se presenta una relación completa y detallada de los bienes muebles e inmuebles:'));
   c.push(parrafo('Bienes Muebles', 11, { bold: true, alignment: 'left', margin: [0, 8, 0, 2] }));
@@ -439,7 +442,7 @@ function buildAnexosDocDefinition(solicitud = {}) {
   const entidad = ltrim(informacionFinanciera.entidadEmpleadora) || ltrim(informacionFinanciera.descripcionActividadEconomica) || 'mi entidad empleadora';
   const neto = recursosDisponibles > 0 ? recursosDisponibles : 0;
   c.push(parrafo(
-    `El suscrito, ${deudorIntro} actuando en nombre propio certifico bajo la gravedad de juramento que actualmente desempeño como ${cargo} de ${entidad}, en donde devengo la suma de ` +
+    `${suscrito(deudor.genero)}, ${deudorIntro} actuando en nombre propio certifico bajo la gravedad de juramento que actualmente desempeño como ${cargo} de ${entidad}, en donde devengo la suma de ` +
     `${letrasMoneda(ingresos) || 'LA SUMA DE CERO PESOS'} (${formatCifra(ingresos) || '$0'})${neto > 0 ? `, sin embargo, percibo ${letrasMoneda(neto)} (${formatCifra(neto)}), por los descuentos de nómina que me son efectuados` : ''}.`
   ));
   if (certificacionLaboralImagen && certificacionLaboralImagen.data) {
@@ -456,7 +459,7 @@ function buildAnexosDocDefinition(solicitud = {}) {
   // ============ ANEXO 7 ============
   c.push(tituloAnexo(7, 'CERTIFICACIÓN DE GASTOS MENSUALES'));
   c.push(parrafo(
-    `El suscrito, ${deudorIntro} actuando en nombre propio por medio del presente certifico que los gastos para mi manutención y los de las personas a mi cargo ascienden a la suma de ` +
+    `${suscrito(deudor.genero)}, ${deudorIntro} actuando en nombre propio por medio del presente certifico que los gastos para mi manutención y los de las personas a mi cargo ascienden a la suma de ` +
     `${letrasMoneda(gastos) || 'LA SUMA DE CERO PESOS'} (${formatCifra(gastos) || '$0'}), correspondientes a vivienda, alimentación, salud, transporte, servicios públicos, educación, y demás egresos indispensables.`
   ));
   c.push(parrafo('RELACIÓN DE GASTOS MENSUALES', 11, { bold: true, alignment: 'left', margin: [0, 10, 0, 6] }));

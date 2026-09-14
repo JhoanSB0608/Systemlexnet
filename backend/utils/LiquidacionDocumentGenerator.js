@@ -54,6 +54,18 @@ const formatCifra = (num) => {
   return `$${n.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 };
 
+// -------------------- Género --------------------
+// Determina si una persona es de género femenino según el valor del campo
+// `genero` del formulario ('Masculino' / 'Femenino'). Cualquier otro valor se
+// interpreta como masculino por defecto (redacción genérica del documento).
+const esFemenino = (genero) => String(genero || '').toLowerCase() === 'femenino';
+
+const identificado = (genero) => (esFemenino(genero) ? 'identificada' : 'identificado');
+const suscrito = (genero) => (esFemenino(genero) ? 'La suscrita' : 'El suscrito');
+const suscritoMayuscula = (genero) => (esFemenino(genero) ? 'LA SUSCRITA' : 'EL SUSCRITO');
+const senor = (genero) => (esFemenino(genero) ? 'señora' : 'señor');
+const prohijado = (genero) => (esFemenino(genero) ? 'mi prohijada' : 'mi prohijado');
+
 // Normaliza la salida de numeroALetras para reflejar la redacción del documento
 // original (p. ej. "MILLONES SEISCIENTOS MIL PESOS", no "MILLONES DE
 // SEISCIENTOS CERO MIL CERO PESOS"). Solo afecta a este generador.
@@ -130,7 +142,7 @@ const nombreCompletoDeudor = (deudor = {}) =>
     .filter(Boolean).join(' ').trim().toUpperCase();
 
 const identificacionDeudor = (deudor = {}) =>
-  `identificado(a) con cédula de ciudadanía No. ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`;
+  `${identificado(deudor.genero)} con cédula de ciudadanía No. ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`;
 
 const datosDeudor = (deudor = {}) => {
   return [
@@ -320,7 +332,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
   c.push(parrafo([
     { text: 'Yo ', bold: false },
     { text: `${nombreApoderado}, `, bold: true },
-    { text: `mayor de edad, identificada con C.C. N° ${safe(apoderado.cedula)} de ${safe(apoderado.ciudadExpedicion)}, con T.P. ${safe(apoderado.tp)} del C.S.J., actuando en nombre y representación de mi prohijado `, bold: false }, 
+    { text: `mayor de edad, ${identificado(apoderado.genero)} con C.C. N° ${safe(apoderado.cedula)} de ${safe(apoderado.ciudadExpedicion)}, con T.P. ${safe(apoderado.tp)} del C.S.J., actuando en nombre y representación de ${prohijado(deudor.genero)} `, bold: false }, 
     { text: `${nombreDeudor}, `, bold: true },
     { text: `mayor de edad, ${identDeudor}, ${bloqueDatos}, respetuosamente me permito solicitar a su despacho la `, bold: false },
     { text: 'APERTURA DEL PROCEDIMIENTO DE LIQUIDACIÓN PATRIMONIAL DIRECTA', bold: true },
@@ -396,7 +408,8 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
 
   c.push(parrafo([
     { text: 'SEXTA. DESIGNAR ', bold: true },
-    'al deudor, señor(a) ',
+    'al deudor, ',
+    { text: `${senor(deudor.genero)} `, bold: false },
     { text: nombreDeudor, bold: true },
     `, mayor de edad, ${identDeudor}, como liquidador o administrador de la liquidación, bajo vigilancia, control e instrucciones del juzgado, con la obligación de rendir los informes, inventarios, cuentas y explicaciones que sean requeridos.`
   ]));
@@ -521,7 +534,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
 
   c.push(parrafo([
     { text: 'PRIMERO. ', bold: true },
-    'El suscrito, ',
+    `${suscrito(deudor.genero)}, `,
     { text: nombreDeudor, bold: true },
     `, mayor de edad, ${identDeudor} y tiene su domicilio en el municipio de${safe(deudor.ciudad)} – ${safe(deudor.departamento)}, dirección física en ${safe(deudor.direccion)}.`
   ]));
@@ -530,7 +543,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
 
   c.push(parrafo([
     { text: 'SEGUNDO. ', bold: true },
-    'El suscrito ostenta la condición de persona natural no comerciante, por cuanto no ejerce profesionalmente actividades mercantiles ni ejecuta actos de comercio de manera habitual y organizada.',
+    `${suscrito(deudor.genero)} ostenta la condición de persona natural no comerciante, por cuanto no ejerce profesionalmente actividades mercantiles ni ejecuta actos de comercio de manera habitual y organizada.`,
   ]));
 
   c.push(saltoDeLinea);
@@ -649,7 +662,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
 
   c.push(parrafo([
     { text: 'DÉCIMO SEXTO. ', bold: true },
-    'El suscrito se compromete a colaborar de manera plena y permanente con el despacho, el liquidador que se designe, los acreedores y las autoridades que intervengan; a suministrar información veraz; a comparecer cuando sea requerido; y a cumplir todas las órdenes que se impartan dentro del trámite.',
+    `${suscrito(deudor.genero)} se compromete a colaborar de manera plena y permanente con el despacho, el liquidador que se designe, los acreedores y las autoridades que intervengan; a suministrar información veraz; a comparecer cuando sea requerido; y a cumplir todas las órdenes que se impartan dentro del trámite.`,
   ]));
 
   c.push(saltoDeLinea);
@@ -922,7 +935,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
 
   c.push(saltoDeLinea);
 
-  bloqueNotificacion(`LA SUSCRITA: ${nombreApoderado}`, [
+  bloqueNotificacion(`${suscritoMayuscula(apoderado.genero)}: ${nombreApoderado}`, [
     `C.C. No. ${safe(apoderado.cedula)} de ${safe(apoderado.ciudadExpedicion)} – Norte de Santander`,
     `T.P. No. ${safe(apoderado.tp)} del Consejo Superior de la Judicatura`,
     `Dirección: ${safe(apoderado.direccion)}`,
@@ -1002,4 +1015,10 @@ module.exports = {
   letrasMoneda,
   nombreCompletoDeudor,
   identificacionDeudor,
+  esFemenino,
+  identificado,
+  suscrito,
+  suscritoMayuscula,
+  senor,
+  prohijado,
 };

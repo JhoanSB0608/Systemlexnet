@@ -283,11 +283,11 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       sede: { departamento: '', ciudad: '', juzgado: '' },
       deudor: {
         primerNombre: '', segundoNombre: '', primerApellido: '', segundoApellido: '',
-        cedula: '', departamentoExpedicion: '', ciudadExpedicion: '', direccion: '',
+        genero: '', cedula: '', departamentoExpedicion: '', ciudadExpedicion: '', direccion: '',
         email: '', telefono: '', departamento: '', ciudad: '', noComerciante: true,
         sociedadConyugalActiva: false, nombreConyuge: '', cedulaConyuge: '', ciudadExpedicionConyuge: '',
       },
-      apoderado: { nombreCompleto: '', cedula: '', ciudadExpedicion: '', tp: '', direccion: '', email: '', telefono: '' },
+      apoderado: { nombreCompleto: '', genero: '', cedula: '', ciudadExpedicion: '', tp: '', direccion: '', email: '', telefono: '' },
       acreencias: [],
       procesosJudiciales: [],
       pruebas: [...PRUEBAS_PREDETERMINADAS],
@@ -1137,6 +1137,25 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                 <Grid item xs={12} sm={6}><GlassTextField {...register('deudor.cedula', { required: 'Campo requerido' })} label="Cédula de Ciudadanía" fullWidth error={!!errors.deudor?.cedula} helperText={errors.deudor?.cedula?.message} /></Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('deudor.ciudadExpedicion', { required: 'Campo requerido' })} label="Ciudad de Expedición" fullWidth error={!!errors.deudor?.ciudadExpedicion} helperText={errors.deudor?.ciudadExpedicion?.message} /></Grid>
 
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth error={!!errors.deudor?.genero}>
+                    <InputLabel>Género</InputLabel>
+                    <Controller
+                      name="deudor.genero"
+                      control={control}
+                      defaultValue=""
+                      rules={{ required: 'Campo requerido' }}
+                      render={({ field }) => (
+                        <Select {...field} label="Género" sx={selectSx}>
+                          <MenuItem value="Masculino">Masculino</MenuItem>
+                          <MenuItem value="Femenino">Femenino</MenuItem>
+                        </Select>
+                      )}
+                    />
+                    {errors.deudor?.genero && <FormHelperText>{errors.deudor?.genero?.message}</FormHelperText>}
+                  </FormControl>
+                </Grid>
+
                 <Grid item xs={12}><GlassTextField {...register('deudor.direccion', { required: 'Campo requerido' })} label="Dirección Física" fullWidth error={!!errors.deudor?.direccion} helperText={errors.deudor?.direccion?.message} /></Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('deudor.email', { required: 'Campo requerido', pattern: { value: /^\S+@\S+$/i, message: 'Email inválido' } })} label="Email" type="email" fullWidth error={!!errors.deudor?.email} helperText={errors.deudor?.email?.message} /></Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('deudor.telefono', { required: 'Campo requerido' })} label="Teléfono" fullWidth error={!!errors.deudor?.telefono} helperText={errors.deudor?.telefono?.message} /></Grid>
@@ -1189,6 +1208,24 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
               <Typography variant="h6">Datos del Apoderado</Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12}><GlassTextField {...register('apoderado.nombreCompleto', { required: 'Campo requerido' })} label="Nombre Completo" fullWidth error={!!errors.apoderado?.nombreCompleto} helperText={errors.apoderado?.nombreCompleto?.message} /></Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth error={!!errors.apoderado?.genero}>
+                    <InputLabel>Género</InputLabel>
+                    <Controller
+                      name="apoderado.genero"
+                      control={control}
+                      defaultValue=""
+                      rules={{ required: 'Campo requerido' }}
+                      render={({ field }) => (
+                        <Select {...field} label="Género" sx={selectSx}>
+                          <MenuItem value="Masculino">Masculino</MenuItem>
+                          <MenuItem value="Femenino">Femenino</MenuItem>
+                        </Select>
+                      )}
+                    />
+                    {errors.apoderado?.genero && <FormHelperText>{errors.apoderado?.genero?.message}</FormHelperText>}
+                  </FormControl>
+                </Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.cedula', { required: 'Campo requerido' })} label="Cédula" fullWidth error={!!errors.apoderado?.cedula} helperText={errors.apoderado?.cedula?.message} /></Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.ciudadExpedicion', { required: 'Campo requerido' })} label="Ciudad de Expedición" fullWidth error={!!errors.apoderado?.ciudadExpedicion} helperText={errors.apoderado?.ciudadExpedicion?.message} /></Grid>
                 <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.tp', { required: 'Campo requerido' })} label="Tarjeta Profesional" fullWidth error={!!errors.apoderado?.tp} helperText={errors.apoderado?.tp?.message} /></Grid>

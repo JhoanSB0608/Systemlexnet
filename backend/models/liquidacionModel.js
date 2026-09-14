@@ -29,6 +29,7 @@ const deudorSchema = new mongoose.Schema({
   primerApellido: { type: String },
   segundoApellido: { type: String },
   nombreCompleto: { type: String },
+  genero: { type: String },
   cedula: { type: String },
   ciudadExpedicion: { type: String },
   telefono: { type: String },
@@ -45,6 +46,7 @@ const deudorSchema = new mongoose.Schema({
 
 const apoderadoSchema = new mongoose.Schema({
   nombreCompleto: { type: String },
+  genero: { type: String },
   cedula: { type: String },
   ciudadExpedicion: { type: String },
   tp: { type: String },
