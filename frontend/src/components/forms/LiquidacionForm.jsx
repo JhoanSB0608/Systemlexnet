@@ -213,7 +213,11 @@ const buildFormattedData = (initialData) => ({
   })),
   entidadesFinancieras: initialData.entidadesFinancieras || [],
   pruebas: initialData.pruebas?.length ? initialData.pruebas : [...PRUEBAS_PREDETERMINADAS],
-  informacionFinanciera: initialData.informacionFinanciera || {},
+  informacionFinanciera: {
+    gastosPersonales: {},
+    obligacionesAlimentarias: [],
+    ...(initialData.informacionFinanciera || {}),
+  },
   anexos: initialData.anexos?.map((a) => ({
     ...a,
     name: a.name,
@@ -290,9 +294,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       entidadesFinancieras: [],
       pruebas: [...PRUEBAS_PREDETERMINADAS],
       informacionFinanciera: {
-        cuantiaTotal: '', numeroObligaciones: '', numeroAcreedores: '', porcentajePasivo: '',
-        ingresosMensuales: '', entidadEmpleadora: '', cargoEmpleo: '', gastosMensuales: '',
-        capacidadPago: '', tieneBienesEmbargables: false,
+        ingresosActividadPrincipal: '',
+        descripcionActividadEconomica: '',
+        tieneEmpleo: false,
+        tipoEmpleo: '',
+        ingresosOtrasActividades: '',
+        gastosPersonales: {},
+        obligacionesAlimentarias: [],
+        tieneBienesEmbargables: false,
       },
       anexos: [],
       firma: { source: 'draw', data: null, file: null },
@@ -305,7 +314,16 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const { fields: acreenciasFields, append: appendAcreencia, remove: removeAcreencia } = useFieldArray({ control, name: 'acreencias', rules: { minLength: { value: 1, message: 'Debe agregar al menos una obligación / acreencia' } } });
   const { fields: procesosFields, append: appendProceso, remove: removeProceso } = useFieldArray({ control, name: 'procesosJudiciales' });
   const { fields: entidadesFields, append: appendEntidad, remove: removeEntidad } = useFieldArray({ control, name: 'entidadesFinancieras' });
+  const { fields: obligacionesFields, append: appendObligacion, remove: removeObligacion } = useFieldArray({ control, name: 'informacionFinanciera.obligacionesAlimentarias' });
   const { fields: anexosFields, append: appendAnexo, remove: removeAnexo } = useFieldArray({ control, name: 'anexos' });
+
+  const updateGastosPersonasCargo = () => {
+    const obligaciones = getValues('informacionFinanciera.obligacionesAlimentarias');
+    const totalCuantia = obligaciones?.reduce((sum, obligacion) => {
+      return sum + (parseFloat(obligacion.cuantia) || 0);
+    }, 0) || 0;
+    setValue('informacionFinanciera.gastosPersonales.gastosPersonasCargo', totalCuantia);
+  };
 
   const pruebasSeleccionadas = watch('pruebas') || [];
   const pruebasPersonalizadas = pruebasSeleccionadas.filter((p) => !PRUEBAS_PREDETERMINADAS.includes(p));
@@ -1940,25 +1958,319 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
         <TabPanel value={tabValue} index={6}>
           <GlassCard sx={{ p: 3 }}>
-            <Stack spacing={3}>
-              <Typography variant="h6">Información Financiera</Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.cuantiaTotal', { valueAsNumber: true })} label="Cuantía Total (si no se diligenció, se calcula de las obligaciones)" type="number" fullWidth error={!!errors.informacionFinanciera?.cuantiaTotal} helperText={errors.informacionFinanciera?.cuantiaTotal?.message} /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.numeroObligaciones', { valueAsNumber: true })} label="Número de Obligaciones (opcional)" type="number" fullWidth helperText="Se calcula automáticamente de acreencias en mora >90 días si deja vacío" /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.numeroAcreedores', { valueAsNumber: true })} label="Número de Acreedores (opcional)" type="number" fullWidth helperText="Se calcula automáticamente si deja vacío" /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.porcentajePasivo', { valueAsNumber: true })} label="Porcentaje del Pasivo (%) (opcional)" type="number" fullWidth helperText="Se calcula automáticamente si deja vacío" /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.ingresosMensuales', { required: 'Campo requerido', valueAsNumber: true })} label="Ingresos Mensuales ($)" type="number" fullWidth error={!!errors.informacionFinanciera?.ingresosMensuales} helperText={errors.informacionFinanciera?.ingresosMensuales?.message} /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.entidadEmpleadora', { required: 'Campo requerido' })} label="Entidad Empleadora" fullWidth error={!!errors.informacionFinanciera?.entidadEmpleadora} helperText={errors.informacionFinanciera?.entidadEmpleadora?.message} /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.cargoEmpleo', { required: 'Campo requerido' })} label="Cargo en la Entidad" fullWidth error={!!errors.informacionFinanciera?.cargoEmpleo} helperText={errors.informacionFinanciera?.cargoEmpleo?.message} /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.gastosMensuales', { required: 'Campo requerido', valueAsNumber: true })} label="Gastos Mensuales ($)" type="number" fullWidth error={!!errors.informacionFinanciera?.gastosMensuales} helperText={errors.informacionFinanciera?.gastosMensuales?.message} /></Grid>
-                <Grid item xs={12} sm={6}><GlassTextField {...register('informacionFinanciera.capacidadPago', { required: 'Campo requerido', valueAsNumber: true })} label="Capacidad de Pago Mensual ($)" type="number" fullWidth error={!!errors.informacionFinanciera?.capacidadPago} helperText={errors.informacionFinanciera?.capacidadPago?.message} /></Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel
-                    control={<Controller name="informacionFinanciera.tieneBienesEmbargables" control={control} render={({ field }) => <Checkbox {...field} checked={!!field.value} />} />}
-                    label="¿Posee bienes embargables?"
-                  />
+            <Stack spacing={4}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar sx={{ bgcolor: alpha(tabsConfig[6].color, 0.1), color: tabsConfig[6].color }}>
+                  <TrendingUpIcon />
+                </Avatar>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Información Financiera y Obligaciones Alimentarias
+                </Typography>
+              </Stack>
+
+              {/* Ingresos */}
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                  Relación de Ingresos
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <GlassTextField
+                      {...register('informacionFinanciera.ingresosActividadPrincipal', { required: 'Campo requerido' })}
+                      label="Ingresos Mensuales por Actividad Principal"
+                      type="number"
+                      fullWidth
+                      error={!!errors.informacionFinanciera?.ingresosActividadPrincipal}
+                      helperText={errors.informacionFinanciera?.ingresosActividadPrincipal?.message} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <GlassTextField
+                      {...register('informacionFinanciera.descripcionActividadEconomica', { required: 'Campo requerido' })}
+                      label="Descripción de la Actividad Económica"
+                      fullWidth
+                      error={!!errors.informacionFinanciera?.descripcionActividadEconomica}
+                      helperText={errors.informacionFinanciera?.descripcionActividadEconomica?.message} />
+                  </Grid>
+                  <Grid item xs={6} sm={6}>
+                    <Controller
+                      name="informacionFinanciera.tieneEmpleo"
+                      control={control}
+                      rules={{ required: 'Campo requerido' }}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              {...field}
+                              checked={field.value}
+                            />
+                          }
+                          label="¿Es empleado?"
+                        />
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={6} sm={6}>
+                    <GlassTextField
+                      {...register('informacionFinanciera.tipoEmpleo', { required: 'Campo requerido' })}
+                      label="Tipo de Empleo (Formal/Informal)"
+                      fullWidth
+                      error={!!errors.informacionFinanciera?.tipoEmpleo}
+                      helperText={errors.informacionFinanciera?.tipoEmpleo?.message} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <GlassTextField
+                      {...register('informacionFinanciera.ingresosOtrasActividades', { required: 'Campo requerido' })}
+                      type="number"
+                      label="Ingresos por Otras Actividades"
+                      fullWidth
+                      error={!!errors.informacionFinanciera?.ingresosOtrasActividades}
+                      helperText={errors.informacionFinanciera?.ingresosOtrasActividades?.message || "Si no posee, escriba 'No poseo'"} />
+                  </Grid>
                 </Grid>
-              </Grid>
+              </Box>
+
+              {/* Gastos */}
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                  Relación de Gastos de Subsistencia
+                </Typography>
+                <Grid container spacing={2}>
+                  {[
+                    { name: 'alimentacion', label: 'Alimentación' },
+                    { name: 'salud', label: 'Salud' },
+                    { name: 'arriendo', label: 'Arriendo o Cuota Vivienda' },
+                    { name: 'serviciosPublicos', label: 'Servicios Públicos' },
+                    { name: 'educacion', label: 'Educación' },
+                    { name: 'transporte', label: 'Transporte' },
+                    { name: 'conservacionBienes', label: 'Conservación de Bienes' },
+                    { name: 'cuotaLeasingHabitacional', label: 'Cuota De Leasing Habitacional' },
+                    { name: 'arriendoOficina', label: 'Arriendo Oficina/consultorio' },
+                    { name: 'cuotaSeguridadSocial', label: 'Cuota De Seguridad Social' },
+                    { name: 'cuotaAdminPropiedadHorizontal', label: 'Cuota De Administración Propiedad Horizontal' },
+                    { name: 'cuotaLeasingVehiculo', label: 'Cuota De Leasing Vehículo' },
+                    { name: 'cuotaLeasingOficina', label: 'Cuota De Leasing Oficina/consultorio' },
+                    { name: 'seguros', label: 'Seguros' },
+                    { name: 'vestuario', label: 'Vestuario' },
+                    { name: 'recreacion', label: 'Recreación' },
+                    { name: 'gastosPersonasCargo', label: 'Gastos Personas a Cargo' },
+                    { name: 'otros', label: 'Otros Gastos' },
+                  ].map((gasto) => (
+                    <Grid item xs={6} sm={4} key={gasto.name}>
+                      <GlassTextField
+                        {...register(`informacionFinanciera.gastosPersonales.${gasto.name}`)}
+                        label={gasto.label}
+                        type="number"
+                        fullWidth
+                        InputProps={{
+                          readOnly: gasto.name === 'gastosPersonasCargo',
+                        }}
+                        InputLabelProps={gasto.name === 'gastosPersonasCargo' ? { shrink: true } : {}}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+
+              {/* Obligaciones Alimentarias */}
+              <Box>
+                <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Obligaciones Alimentarias
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      appendObligacion({ beneficiario: '', tipoIdentificacion: '', numeroIdentificacion: '', parentesco: '', cuantia: '', periodoPago: '', estadoObligacion: '', obligacionDemandada: false, paisResidencia: '', departamento: '', ciudad: '', direccion: '', emailBeneficiario: '' });
+                      setTimeout(updateGastosPersonasCargo, 0);
+                    }}
+                    startIcon={<AddIcon />}
+                    size="small"
+                    sx={{
+                      borderRadius: '12px',
+                      borderColor: alpha(tabsConfig[6].color, 0.3),
+                      color: tabsConfig[6].color,
+                      '&:hover': {
+                        borderColor: tabsConfig[6].color,
+                        background: alpha(tabsConfig[6].color, 0.1),
+                      },
+                    }}
+                  >
+                    Agregar
+                  </Button>
+                </Stack>
+
+                {obligacionesFields.length === 0 ? (
+                  <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+                    <Typography variant="body2">No hay obligaciones alimentarias agregadas</Typography>
+                  </Box>
+                ) : (
+                  <Stack spacing={2}>
+                    {obligacionesFields.map((field, index) => (
+                      <Box key={field.id}>
+                        <GlassCard sx={{ border: `1px solid ${alpha(tabsConfig[6].color, 0.2)}` }}>
+                          <Box sx={{ p: 2 }}>
+                            <Stack spacing={2}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Chip
+                                  label={`Obligación #${index + 1}`}
+                                  size="small"
+                                  sx={{
+                                    background: alpha(tabsConfig[6].color, 0.1),
+                                    color: tabsConfig[6].color,
+                                    fontWeight: 600,
+                                  }} />
+                                <IconButton
+                                  onClick={() => {
+                                    removeObligacion(index);
+                                    setTimeout(updateGastosPersonasCargo, 0);
+                                  }}
+                                  size="small"
+                                  sx={{
+                                    color: theme.palette.error.main,
+                                    '&:hover': { background: alpha(theme.palette.error.main, 0.1) },
+                                  }}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Stack>
+
+                              <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
+                                  <GlassTextField
+                                    {...register(`informacionFinanciera.obligacionesAlimentarias.${index}.beneficiario`, { required: 'Campo requerido' })}
+                                    label="Beneficiario"
+                                    fullWidth
+                                    error={!!errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.beneficiario} />
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                  <FormControl fullWidth error={!!errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.tipoIdentificacion}>
+                                    <InputLabel>Tipo de Identificación</InputLabel>
+                                    <Controller
+                                      name={`informacionFinanciera.obligacionesAlimentarias.${index}.tipoIdentificacion`}
+                                      control={control}
+                                      defaultValue=""
+                                      rules={{ required: 'Campo requerido' }}
+                                      render={({ field }) => (
+                                        <Select
+                                          {...field}
+                                          sx={selectSx}
+                                        >
+                                          <MenuItem value="Cedula de Ciudadanía">Cedula de Ciudadanía</MenuItem>
+                                          <MenuItem value="Cedula de Extranjeria">Cedula de Extranjeria</MenuItem>
+                                          <MenuItem value="Numero de Identificación de Extranjero">Numero de Identificación de Extranjero</MenuItem>
+                                          <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                                          <MenuItem value="Registro Civil">Registro Civil</MenuItem>
+                                          <MenuItem value="Tarjeta de Identidad">Tarjeta de Identidad</MenuItem>
+                                        </Select>
+                                      )}
+                                    />
+                                    {errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.tipoIdentificacion && <FormHelperText>{errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.tipoIdentificacion?.message}</FormHelperText>}
+                                  </FormControl>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                  <GlassTextField
+                                    {...register(`informacionFinanciera.obligacionesAlimentarias.${index}.numeroIdentificacion`, { required: 'Campo requerido' })}
+                                    label="Número de Identificación"
+                                    fullWidth
+                                    error={!!errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.numeroIdentificacion} />
+                                </Grid>
+                                <Grid item xs={6} sm={4}>
+                                  <GlassTextField
+                                    {...register(`informacionFinanciera.obligacionesAlimentarias.${index}.parentesco`, { required: 'Campo requerido' })}
+                                    label="Parentesco"
+                                    fullWidth
+                                    error={!!errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.parentesco} />
+                                </Grid>
+                                <Grid item xs={6} sm={4}>
+                                  <Controller
+                                    name={`informacionFinanciera.obligacionesAlimentarias.${index}.cuantia`}
+                                    control={control}
+                                    rules={{ required: 'Campo requerido' }}
+                                    render={({ field, fieldState: { error } }) => (
+                                      <GlassTextField
+                                        {...field}
+                                        label="Cuantía"
+                                        type="number"
+                                        fullWidth
+                                        error={!!error}
+                                        helperText={error?.message}
+                                        onChange={(e) => {
+                                          field.onChange(e);
+                                          updateGastosPersonasCargo();
+                                        }}
+                                      />
+                                    )}
+                                  />
+                                </Grid>
+                                <Grid item xs={6} sm={4}>
+                                  <GlassTextField
+                                    {...register(`informacionFinanciera.obligacionesAlimentarias.${index}.periodoPago`, { required: 'Campo requerido' })}
+                                    label="Periodo de Pago"
+                                    fullWidth
+                                    error={!!errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.periodoPago} />
+                                </Grid>
+                                <Grid item xs={12}>
+                                  <GlassTextField
+                                    {...register(`informacionFinanciera.obligacionesAlimentarias.${index}.estadoObligacion`, { required: 'Campo requerido' })}
+                                    label="Estado de la Obligación"
+                                    helperText="Ej: No demandada, En proceso, etc."
+                                    fullWidth
+                                    error={!!errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.estadoObligacion} />
+                                </Grid>
+                                <Grid item xs={12}>
+                                  <FormControlLabel
+                                    control={<Checkbox {...register(`informacionFinanciera.obligacionesAlimentarias.${index}.obligacionDemandada`)} />}
+                                    label="¿La obligación se encuentra demandada?"
+                                  />
+                                </Grid>
+                                <LocationSelector
+                                  control={control}
+                                  errors={errors}
+                                  watch={watch}
+                                  setValue={setValue}
+                                  showCountry={true}
+                                  showDepartment={true}
+                                  showCity={true}
+                                  countryFieldName={`informacionFinanciera.obligacionesAlimentarias.${index}.paisResidencia`}
+                                  departmentFieldName={`informacionFinanciera.obligacionesAlimentarias.${index}.departamento`}
+                                  cityFieldName={`informacionFinanciera.obligacionesAlimentarias.${index}.ciudad`}
+                                  countryLabel="País de Residencia"
+                                  departmentLabel="Departamento"
+                                  cityLabel="Ciudad"
+                                  countryGridProps={{ xs: 12, sm: 4 }}
+                                  departmentGridProps={{ xs: 12, sm: 4 }}
+                                  cityGridProps={{ xs: 12, sm: 4 }}
+                                />
+                                <Grid item xs={12} sm={6}>
+                                  <GlassTextField
+                                    {...register(`informacionFinanciera.obligacionesAlimentarias.${index}.direccion`, { required: 'Campo requerido' })}
+                                    label="Dirección"
+                                    fullWidth
+                                    error={!!errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.direccion} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                  <GlassTextField
+                                    {...register(`informacionFinanciera.obligacionesAlimentarias.${index}.emailBeneficiario`)}
+                                    label="Correo Electrónico del Beneficiario"
+                                    type="email"
+                                    fullWidth
+                                    error={!!errors.informacionFinanciera?.obligacionesAlimentarias?.[index]?.emailBeneficiario} />
+                                </Grid>
+                              </Grid>
+                            </Stack>
+                          </Box>
+                        </GlassCard>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+
+              <FormControlLabel
+                control={<Controller name="informacionFinanciera.tieneBienesEmbargables" control={control} render={({ field }) => <Checkbox {...field} checked={!!field.value} />} />}
+                label="¿Posee bienes embargables?"
+              />
+
               <Button variant="contained" onClick={() => handleSaveSection('informacionFinanciera', 7)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
                 {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
               </Button>

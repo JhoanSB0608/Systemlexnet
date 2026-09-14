@@ -30,6 +30,20 @@ const PAGE_HEIGHT = 792;
 const MARGIN = 72;
 const COL_WIDTH = PAGE_WIDTH - MARGIN * 2; // 468
 
+const tableLayout = {
+  hLineWidth: () => 1,
+  vLineWidth: () => 1,
+  paddingLeft: () => 5,
+  paddingRight: () => 5,
+  paddingTop: () => 3,
+  paddingBottom: () => 3,
+};
+
+const formatCurrency = (num) => {
+  if (num == null || Number.isNaN(Number(num))) return '$0,00';
+  return `$${Number(num).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 // -------------------- Helpers --------------------
 const safe = (v, fallback = '') => (v === undefined || v === null || v === '') ? fallback : v;
 const ltrim = (s) => String(s == null ? '' : s).trim();
@@ -218,9 +232,25 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
 
   const totalCapital = acreencias.reduce((s, a) => s + (Number(a.capital) || 0), 0);
   const cuantia = Number(informacionFinanciera.cuantiaTotal || totalCapital) || 0;
-  const ingresos = Number(informacionFinanciera.ingresosMensuales) || 0;
-  const gastos = Number(informacionFinanciera.gastosMensuales) || 0;
-  const capacidad = Number(informacionFinanciera.capacidadPago) || 0;
+
+  // Ingresos: se priorizan los campos del formulario de liquidación (estilo
+  // insolvencia); si no están presentes se conservan los valores anteriores.
+  const actPrincipal = Number(informacionFinanciera.ingresosActividadPrincipal) || 0;
+  const otrasActividades = Number(informacionFinanciera.ingresosOtrasActividades) || 0;
+  const ingresos = (actPrincipal + otrasActividades) || Number(informacionFinanciera.ingresosMensuales) || 0;
+
+  // Gastos: si el usuario diligenció la relación detallada se suman sus
+  // valores; de lo contrario se usa el total autorreportado.
+  const gastosPersonales = (informacionFinanciera.gastosPersonales && typeof informacionFinanciera.gastosPersonales === 'object')
+    ? informacionFinanciera.gastosPersonales
+    : {};
+  const gastosDetallados = Object.values(gastosPersonales).reduce((s, v) => s + (Number(v) || 0), 0);
+  const gastos = gastosDetallados || Number(informacionFinanciera.gastosMensuales) || 0;
+  const capacidad = Number(informacionFinanciera.capacidadPago) || Math.max(ingresos - gastos, 0);
+
+  const cargoEmpleo = safe(informacionFinanciera.cargoEmpleo) || safe(informacionFinanciera.tipoEmpleo) || 'actividad económica';
+  const entidadEmpleadora = safe(informacionFinanciera.entidadEmpleadora) || safe(informacionFinanciera.descripcionActividadEconomica) || 'mi entidad empleadora';
+  const obligacionesAlimentarias = Array.isArray(informacionFinanciera.obligacionesAlimentarias) ? informacionFinanciera.obligacionesAlimentarias : [];
 
   // Las obligaciones se derivan de las acreencias marcadas como en mora por más
   // de 90 días. Si no hay ninguna marcada se conservan los valores autorreportados.
@@ -527,7 +557,7 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     { text: 'CUARTO. ', bold: true },
     `Actualmente percibo ingresos mensuales aproximados de `,
     { text: `${letrasMoneda(ingresos)} (${formatCifra(ingresos)}),`.toUpperCase(), bold: true },
-    ` provenientes del salario como ${safe(informacionFinanciera.cargoEmpleo)} del ${safe(informacionFinanciera.entidadEmpleadora)}.`,
+    ` provenientes del salario como ${cargoEmpleo} del ${entidadEmpleadora}.`,
   ]));
 
   c.push(saltoDeLinea);
@@ -632,6 +662,201 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     { text: 'DÉCIMO SEXTO. ', bold: true },
     'El suscrito se compromete a colaborar de manera plena y permanente con el despacho, el liquidador que se designe, los acreedores y las autoridades que intervengan; a suministrar información veraz; a comparecer cuando sea requerido; y a cumplir todas las órdenes que se impartan dentro del trámite.',
   ]));
+
+  c.push(saltoDeLinea);
+
+  // ============ RELACIÓN ECONÓMICA DETALLADA ============
+  c.push({ ...tituloSeccion('RELACIÓN DE GASTOS DE SUBSISTENCIA DEL DEUDOR Y DE PERSONAS A SU CARGO'), });
+
+  const gastosLabels = {
+    alimentacion: 'Alimentación',
+    salud: 'Salud',
+    arriendo: 'Arriendo o Cuota Vivienda',
+    serviciosPublicos: 'Servicios Públicos',
+    educacion: 'Educación',
+    transporte: 'Transporte',
+    conservacionBienes: 'Conservación de Bienes',
+    cuotaLeasingHabitacional: 'Cuota De Leasing Habitacional',
+    arriendoOficina: 'Arriendo Oficina/Consultorio',
+    cuotaSeguridadSocial: 'Cuota De Seguridad Social',
+    cuotaAdminPropiedadHorizontal: 'Cuota De Administración Propiedad Horizontal',
+    cuotaLeasingVehiculo: 'Cuota De Leasing Vehículo',
+    cuotaLeasingOficina: 'Cuota De Leasing Oficina/Consultorio',
+    seguros: 'Seguros',
+    vestuario: 'Vestuario',
+    recreacion: 'Recreación',
+    gastosPersonasCargo: 'Gastos Personas a Cargo',
+    otros: 'Otros Gastos',
+  };
+
+  const bodyGastos = [
+    [
+      {
+        text: 'Gastos de Subsistencia',
+        bold: true,
+        fontSize: 9,
+        alignment: 'center',
+        margin: [0, 4, 0, 4],
+        colSpan: 2
+      },
+      {}
+    ],
+  ];
+
+  let totalGastosDetalle = 0;
+  for (const key in gastosPersonales) {
+    const value = parseFloat(gastosPersonales[key]);
+    if (value > 0 && gastosLabels[key]) {
+      bodyGastos.push([
+        { text: gastosLabels[key], fontSize: 9, margin: [4, 3, 2, 3] },
+        { text: formatCurrency(value), fontSize: 9, margin: [4, 3, 2, 3] }
+      ]);
+      totalGastosDetalle += value;
+    }
+  }
+
+  if (bodyGastos.length === 1) {
+    bodyGastos.push([
+      { text: 'No se reportan gastos.', fontSize: 9, margin: [4, 3, 2, 3], colSpan: 2, alignment: 'center' },
+      {}
+    ]);
+  } else {
+    bodyGastos.push([
+      { text: 'TOTAL GASTOS', bold: true, fontSize: 9, margin: [4, 3, 2, 3] },
+      { text: formatCurrency(totalGastosDetalle), bold: true, fontSize: 9, margin: [4, 3, 2, 3] }
+    ]);
+  }
+
+  c.push({
+    unbreakable: true,
+    columns: [
+      {
+        width: '*',
+        table: {
+          widths: ['*', '*'],
+          body: bodyGastos
+        },
+        layout: tableLayout,
+      }
+    ],
+    margin: [15, 0, 0, 10]
+  });
+
+  c.push({ ...tituloSeccion('RELACIÓN DE INGRESOS'), });
+
+  const bodyIngresos = [
+    [
+      {
+        text: 'Ingresos',
+        bold: true,
+        fontSize: 9,
+        alignment: 'center',
+        margin: [0, 4, 0, 4],
+        colSpan: 2
+      },
+      {}
+    ],
+    [
+      { text: 'Ingresos mensuales por actividad económica', fontSize: 9, margin: [4, 3, 2, 3] },
+      { text: formatCurrency(actPrincipal), fontSize: 9, margin: [4, 3, 2, 3], alignment: 'right' }
+    ],
+    [
+      { text: 'Empleo', fontSize: 9, margin: [4, 3, 2, 3] },
+      { text: informacionFinanciera.tieneEmpleo ? 'SI' : 'NO', fontSize: 9, margin: [4, 3, 2, 3] }
+    ],
+    [
+      { text: 'Tipo de empleo', fontSize: 9, margin: [4, 3, 2, 3] },
+      { text: safe(informacionFinanciera.tipoEmpleo), fontSize: 9, margin: [4, 3, 2, 3] }
+    ],
+    [
+      { text: 'Descripción de la actividad económica', fontSize: 9, margin: [4, 3, 2, 3] },
+      { text: safe(informacionFinanciera.descripcionActividadEconomica), fontSize: 9, margin: [4, 3, 2, 3] }
+    ],
+    [
+      { text: 'Ingresos mensuales por otras actividades', fontSize: 9, margin: [4, 3, 2, 3] },
+      { text: formatCurrency(otrasActividades), fontSize: 9, margin: [4, 3, 2, 3], alignment: 'right' }
+    ],
+    [
+      { text: 'TOTAL DE INGRESOS MENSUALES', bold: true, fontSize: 9, margin: [4, 3, 2, 3] },
+      { text: formatCurrency(actPrincipal + otrasActividades), bold: true, fontSize: 9, margin: [4, 3, 2, 3], alignment: 'right' }
+    ],
+  ];
+
+  c.push({
+    unbreakable: true,
+    columns: [
+      {
+        width: '*',
+        table: {
+          widths: ['*', '*'],
+          body: bodyIngresos
+        },
+        layout: tableLayout,
+      }
+    ],
+    margin: [15, 0, 0, 10]
+  });
+
+  // ============ OBLIGACIONES ALIMENTARIAS ============
+  c.push({ ...tituloSeccion('OBLIGACIONES ALIMENTARIAS'), });
+
+  if (!obligacionesAlimentarias.length) {
+    c.push(parrafo('No se reportan obligaciones alimentarias.'));
+  } else {
+    obligacionesAlimentarias.forEach((o, idx) => {
+      const body = [
+        [
+          {
+            text: `Obligación Alimentaria No. ${idx + 1}`,
+            bold: true,
+            fontSize: 9,
+            alignment: 'center',
+            margin: [0, 4, 0, 4],
+            colSpan: 2
+          },
+          {}
+        ],
+      ];
+
+      const detalleRows = [
+        ['Beneficiario', safe(o.beneficiario)],
+        ['Tipo de Identificación', safe(o.tipoIdentificacion)],
+        ['Número de Identificación', safe(o.numeroIdentificacion)],
+        ['Parentesco', safe(o.parentesco)],
+        ['Cuantía Mensual', formatCurrency(o.cuantia)],
+        ['Periodo de Pago', safe(o.periodoPago)],
+        ['Estado de la Obligación', safe(o.estadoObligacion)],
+        ['¿La obligación se encuentra demandada?', o.obligacionDemandada ? 'SI' : 'NO'],
+        ['País de Residencia', safe(o.paisResidencia)],
+        ['Departamento', safe(o.departamento)],
+        ['Ciudad', safe(o.ciudad)],
+        ['Dirección', safe(o.direccion)],
+        ['Correo Electrónico del Beneficiario', safe(o.emailBeneficiario)]
+      ];
+
+      detalleRows.forEach(row => {
+        body.push([
+          { text: row[0], fontSize: 9, margin: [4, 3, 2, 3] },
+          { text: row[1], fontSize: 9, margin: [4, 3, 2, 3] }
+        ]);
+      });
+
+      c.push({
+        unbreakable: true,
+        columns: [
+          {
+            width: '*',
+            table: {
+              widths: ['*', '*'],
+              body
+            },
+            layout: tableLayout,
+          }
+        ],
+        margin: [15, 0, 0, 10]
+      });
+    });
+  }
 
   c.push(saltoDeLinea);
 

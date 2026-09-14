@@ -237,8 +237,15 @@ function buildAnexosDocDefinition(solicitud = {}) {
   const obligacionesEnMora = (acreencias || []).filter((a) => a.creditoEnMora === true && a.moraMas90Dias === true);
   const capitalObligaciones = obligacionesEnMora.reduce((s, a) => s + (Number(a.capital) || 0), 0);
 
-  const ingresos = Number(informacionFinanciera.ingresosMensuales) || 0;
-  const gastos = Number(informacionFinanciera.gastosMensuales) || 0;
+  const actPrincipal = Number(informacionFinanciera.ingresosActividadPrincipal) || 0;
+  const otrasActividades = Number(informacionFinanciera.ingresosOtrasActividades) || 0;
+  const ingresos = (actPrincipal + otrasActividades) || Number(informacionFinanciera.ingresosMensuales) || 0;
+
+  const gastosPersonales = (informacionFinanciera.gastosPersonales && typeof informacionFinanciera.gastosPersonales === 'object')
+    ? informacionFinanciera.gastosPersonales
+    : {};
+  const gastosDetallados = Object.values(gastosPersonales).reduce((s, v) => s + (Number(v) || 0), 0);
+  const gastos = gastosDetallados || Number(informacionFinanciera.gastosMensuales) || 0;
   const recursosDisponibles = ingresos - gastos;
 
   const docDefinition = {
@@ -249,12 +256,6 @@ function buildAnexosDocDefinition(solicitud = {}) {
       fontSize: 11,
       lineHeight: 1.3,
     },
-    footer: (currentPage, pageCount) => ({
-      text: `Página ${currentPage} de ${pageCount}`,
-      alignment: 'center',
-      fontSize: 8,
-      margin: [0, 10, 0, 0],
-    }),
     content: [],
   };
 
@@ -317,7 +318,8 @@ function buildAnexosDocDefinition(solicitud = {}) {
     ];
     c.push({ table: { widths: ['42%', '20%', '18%', '20%'], body: summaryBody }, layout: tableLayout, margin: [0, 0, 0, 14] });
 
-    c.push(overrideTitle('DETALLE DE CADA ACREENCIA', { pageBreak: 'before' }));
+    c.push(overrideTitle('DETALLE DE CADA ACREENCIA', { pageBreak: 'before' }));   
+    
     acreencias.forEach((a, idx) => {
       c.push(detalleAcreencia(a, idx));
     });
@@ -388,8 +390,8 @@ function buildAnexosDocDefinition(solicitud = {}) {
 
   // ============ ANEXO 6 ============
   c.push(tituloAnexo(6, 'CERTIFICACIÓN LABORAL DE INGRESOS'));
-  const cargo = ltrim(informacionFinanciera.cargoEmpleo) || 'cargo';
-  const entidad = ltrim(informacionFinanciera.entidadEmpleadora) || 'mi entidad empleadora';
+  const cargo = ltrim(informacionFinanciera.cargoEmpleo) || ltrim(informacionFinanciera.tipoEmpleo) || 'cargo';
+  const entidad = ltrim(informacionFinanciera.entidadEmpleadora) || ltrim(informacionFinanciera.descripcionActividadEconomica) || 'mi entidad empleadora';
   const neto = recursosDisponibles > 0 ? recursosDisponibles : 0;
   c.push(parrafo(
     `El suscrito, ${deudorIntro} actuando en nombre propio certifico bajo la gravedad de juramento que actualmente desempeño como ${cargo} de ${entidad}, en donde devengo la suma de ` +
@@ -413,12 +415,38 @@ function buildAnexosDocDefinition(solicitud = {}) {
     `${letrasMoneda(gastos) || 'LA SUMA DE CERO PESOS'} (${formatCifra(gastos) || '$0'}), correspondientes a vivienda, alimentación, salud, transporte, servicios públicos, educación, y demás egresos indispensables.`
   ));
   c.push(parrafo('RELACIÓN DE GASTOS MENSUALES', 11, { bold: true, alignment: 'left', margin: [0, 10, 0, 6] }));
+  const gastosLabels = {
+    alimentacion: 'Alimentación',
+    salud: 'Salud',
+    arriendo: 'Arriendo o Cuota Vivienda',
+    serviciosPublicos: 'Servicios Públicos',
+    educacion: 'Educación',
+    transporte: 'Transporte',
+    conservacionBienes: 'Conservación de Bienes',
+    cuotaLeasingHabitacional: 'Cuota De Leasing Habitacional',
+    arriendoOficina: 'Arriendo Oficina/Consultorio',
+    cuotaSeguridadSocial: 'Cuota De Seguridad Social',
+    cuotaAdminPropiedadHorizontal: 'Cuota De Administración Propiedad Horizontal',
+    cuotaLeasingVehiculo: 'Cuota De Leasing Vehículo',
+    cuotaLeasingOficina: 'Cuota De Leasing Oficina/Consultorio',
+    seguros: 'Seguros',
+    vestuario: 'Vestuario',
+    recreacion: 'Recreación',
+    gastosPersonasCargo: 'Gastos Personas a Cargo',
+    otros: 'Otros Gastos',
+  };
   const gastosBody = [
     [
       { text: 'Concepto', bold: true, fontSize: 9 },
       { text: 'Valor', bold: true, fontSize: 9, alignment: 'right' },
     ],
-    [{ text: 'Total gastos mensuales', fontSize: 9 }, { text: formatCifra(gastos) || '$0', fontSize: 9, alignment: 'right' }],
+    ...Object.entries(gastosPersonales)
+      .filter(([key, value]) => gastosLabels[key] && Number(value) > 0)
+      .map(([key, value]) => [
+        { text: gastosLabels[key], fontSize: 9 },
+        { text: formatCifra(value) || '$0', fontSize: 9, alignment: 'right' },
+      ]),
+    [{ text: 'Total gastos mensuales', fontSize: 9, bold: true }, { text: formatCifra(gastos) || '$0', fontSize: 9, alignment: 'right', bold: true }],
     [{ text: 'Monto de recursos disponibles', fontSize: 9 }, { text: formatCifra(recursosDisponibles) || '$0', fontSize: 9, alignment: 'right' }],
   ];
   c.push({ table: { widths: ['70%', '30%'], body: gastosBody }, layout: tableLayout, margin: [0, 0, 0, 4] });
