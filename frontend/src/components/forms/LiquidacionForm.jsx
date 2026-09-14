@@ -27,7 +27,6 @@ import {
   CloudDone as CloudDoneIcon,
   CloudUpload as CloudUploadIcon,
   AccountBalanceWallet as AccountBalanceWalletIcon,
-  Business as BusinessIcon,
   Warning as WarningIcon,
   Verified as VerifiedIcon,
   Info as InfoIcon,
@@ -211,7 +210,6 @@ const buildFormattedData = (initialData) => ({
     ...p,
     valor: p.valor ?? '',
   })),
-  entidadesFinancieras: initialData.entidadesFinancieras || [],
   pruebas: initialData.pruebas?.length ? initialData.pruebas : [...PRUEBAS_PREDETERMINADAS],
   informacionFinanciera: {
     gastosPersonales: {},
@@ -227,6 +225,7 @@ const buildFormattedData = (initialData) => ({
   firmaDeudor: initialData.firmaDeudor || { source: 'draw', data: null, file: null },
   bienesInventarioImagen: initialData.bienesInventarioImagen || { name: '', url: '', descripcion: '' },
   certificacionLaboralImagen: initialData.certificacionLaboralImagen || { name: '', url: '', descripcion: '' },
+  redamArchivo: initialData.redamArchivo || { name: '', url: '', tipo: '', descripcion: '' },
 });
 
 const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
@@ -291,7 +290,6 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       apoderado: { nombreCompleto: '', cedula: '', ciudadExpedicion: '', tp: '', direccion: '', email: '', telefono: '' },
       acreencias: [],
       procesosJudiciales: [],
-      entidadesFinancieras: [],
       pruebas: [...PRUEBAS_PREDETERMINADAS],
       informacionFinanciera: {
         ingresosActividadPrincipal: '',
@@ -308,12 +306,12 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       firmaDeudor: { source: 'draw', data: null, file: null },
       bienesInventarioImagen: { name: '', url: '', descripcion: '' },
       certificacionLaboralImagen: { name: '', url: '', descripcion: '' },
+      redamArchivo: { name: '', url: '', tipo: '', descripcion: '' },
     }
   });
 
   const { fields: acreenciasFields, append: appendAcreencia, remove: removeAcreencia } = useFieldArray({ control, name: 'acreencias', rules: { minLength: { value: 1, message: 'Debe agregar al menos una obligación / acreencia' } } });
   const { fields: procesosFields, append: appendProceso, remove: removeProceso } = useFieldArray({ control, name: 'procesosJudiciales' });
-  const { fields: entidadesFields, append: appendEntidad, remove: removeEntidad } = useFieldArray({ control, name: 'entidadesFinancieras' });
   const { fields: obligacionesFields, append: appendObligacion, remove: removeObligacion } = useFieldArray({ control, name: 'informacionFinanciera.obligacionesAlimentarias' });
   const { fields: anexosFields, append: appendAnexo, remove: removeAnexo } = useFieldArray({ control, name: 'anexos' });
 
@@ -359,6 +357,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const [uploadingAnexos, setUploadingAnexos] = useState({});
   const [uploadingImagenAnexo3, setUploadingImagenAnexo3] = useState(false);
   const [uploadingImagenAnexo6, setUploadingImagenAnexo6] = useState(false);
+  const [uploadingRedam, setUploadingRedam] = useState(false);
   const [isConfirmModalOpen, setConfirmModalOpen] = useState(false);
   const [savedSections, setSavedSections] = useState({
     sede: false,
@@ -366,7 +365,6 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     apoderado: false,
     acreencias: false,
     procesosJudiciales: false,
-    entidadesFinancieras: false,
     informacionFinanciera: false,
     anexos: false,
     firma: false,
@@ -478,7 +476,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       } else {
         setSavedSections({
           sede: true, deudor: true, apoderado: true, acreencias: true,
-          procesosJudiciales: true, entidadesFinancieras: true, informacionFinanciera: true, anexos: true, firma: true,
+          procesosJudiciales: true, informacionFinanciera: true, anexos: true, firma: true,
         });
       }
       finish();
@@ -645,6 +643,30 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const imagenAnexo6Url = watch('certificacionLaboralImagen.url');
   const imagenAnexo6Name = watch('certificacionLaboralImagen.name');
 
+  const redamUrl = watch('redamArchivo.url');
+  const redamName = watch('redamArchivo.name');
+  const redamTipo = watch('redamArchivo.tipo');
+
+  const handleRedamChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingRedam(true);
+    try {
+      const mime = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
+      const { fileUrl, uniqueFilename } = await uploadFile(file);
+      setValue('redamArchivo.name', uniqueFilename, { shouldValidate: true });
+      setValue('redamArchivo.url', fileUrl, { shouldValidate: true });
+      setValue('redamArchivo.tipo', mime, { shouldValidate: true });
+      setValue('redamArchivo.descripcion', 'Anexo REDAM');
+    } catch (error) {
+      console.error('Error subiendo archivo REDAM:', error);
+      setError('redamArchivo.url', { type: 'manual', message: 'Error al subir el archivo' });
+    } finally {
+      setUploadingRedam(false);
+      e.target.value = null;
+    }
+  };
+
   const handleSignatureFileUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -704,7 +726,6 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       case 'apoderado': fieldsToValidate = ['apoderado']; break;
       case 'acreencias': fieldsToValidate = ['acreencias']; break;
       case 'procesosJudiciales': fieldsToValidate = ['procesosJudiciales']; break;
-      case 'entidadesFinancieras': fieldsToValidate = ['entidadesFinancieras']; break;
       case 'informacionFinanciera': fieldsToValidate = ['informacionFinanciera']; break;
       case 'anexos': fieldsToValidate = ['anexos']; break;
       case 'firma': fieldsToValidate = ['firma', 'firmaDeudor']; break;
@@ -842,7 +863,6 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         apoderado: false,
         acreencias: false,
         procesosJudiciales: false,
-        entidadesFinancieras: false,
         informacionFinanciera: false,
         anexos: false,
         firma: false,
@@ -878,7 +898,6 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     { key: 'apoderado', label: 'Apoderado', icon: GavelIcon, color: '#ff9800' },
     { key: 'acreencias', label: 'Acreencias', icon: ReceiptIcon, color: '#ff5722' },
     { key: 'procesosJudiciales', label: 'Procesos', icon: AccountBalanceIcon, color: '#f44336' },
-    { key: 'entidadesFinancieras', label: 'Centrales de Riesgo', icon: BusinessIcon, color: '#9c27b0' },
     { key: 'informacionFinanciera', label: 'Financiera', icon: TrendingUpIcon, color: '#4caf50' },
     { key: 'anexos', label: 'Pruebas', icon: AttachFileIcon, color: '#009688' },
     { key: 'firma', label: 'Firma', icon: CreateIcon, color: '#795548' },
@@ -1931,36 +1950,10 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={5}>
-          <Stack spacing={3}>
-            <Typography variant="h6">Centrales de Riesgo y Entidades Financieras</Typography>
-            <Alert severity="info" sx={{ mb: 1 }}>
-              Estas entidades se listarán dinámicamente en la pretensión DÉCIMA CUARTA del documento. La cláusula de "demás centrales de riesgo" se agrega automáticamente al final.
-            </Alert>
-            {entidadesFields.map((field, index) => (
-              <GlassCard key={field.id} sx={{ p: 3 }}>
-                <Stack spacing={2}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Chip avatar={<Avatar><BusinessIcon /></Avatar>} label={`Entidad Financiera / Central de Riesgo #${index + 1}`} />
-                    <IconButton onClick={() => removeEntidad(index)} size="small"><DeleteIcon /></IconButton>
-                  </Stack>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}><GlassTextField {...register(`entidadesFinancieras.${index}.nombre`, { required: 'Campo requerido' })} label="Nombre de la Entidad" fullWidth error={errors.entidadesFinancieras?.[index]?.nombre} helperText={errors.entidadesFinancieras?.[index]?.nombre?.message} /></Grid>
-                  </Grid>
-                </Stack>
-              </GlassCard>
-            ))}
-            <Button variant="outlined" onClick={() => appendEntidad({})} startIcon={<AddIcon />}>Añadir Entidad Financiera / Central de Riesgo</Button>
-            <Button variant="contained" onClick={() => handleSaveSection('entidadesFinancieras', 6)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
-              {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
-            </Button>
-          </Stack>
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={6}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={4}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar sx={{ bgcolor: alpha(tabsConfig[6].color, 0.1), color: tabsConfig[6].color }}>
+                <Avatar sx={{ bgcolor: alpha(tabsConfig[5].color, 0.1), color: tabsConfig[5].color }}>
                   <TrendingUpIcon />
                 </Avatar>
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -2087,11 +2080,11 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                     size="small"
                     sx={{
                       borderRadius: '12px',
-                      borderColor: alpha(tabsConfig[6].color, 0.3),
-                      color: tabsConfig[6].color,
+                      borderColor: alpha(tabsConfig[5].color, 0.3),
+                      color: tabsConfig[5].color,
                       '&:hover': {
-                        borderColor: tabsConfig[6].color,
-                        background: alpha(tabsConfig[6].color, 0.1),
+                        borderColor: tabsConfig[5].color,
+                        background: alpha(tabsConfig[5].color, 0.1),
                       },
                     }}
                   >
@@ -2107,7 +2100,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                   <Stack spacing={2}>
                     {obligacionesFields.map((field, index) => (
                       <Box key={field.id}>
-                        <GlassCard sx={{ border: `1px solid ${alpha(tabsConfig[6].color, 0.2)}` }}>
+                        <GlassCard sx={{ border: `1px solid ${alpha(tabsConfig[5].color, 0.2)}` }}>
                           <Box sx={{ p: 2 }}>
                             <Stack spacing={2}>
                               <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -2115,8 +2108,8 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                                   label={`Obligación #${index + 1}`}
                                   size="small"
                                   sx={{
-                                    background: alpha(tabsConfig[6].color, 0.1),
-                                    color: tabsConfig[6].color,
+                                    background: alpha(tabsConfig[5].color, 0.1),
+                                    color: tabsConfig[5].color,
                                     fontWeight: 600,
                                   }} />
                                 <IconButton
@@ -2271,14 +2264,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                 label="¿Posee bienes embargables?"
               />
 
-              <Button variant="contained" onClick={() => handleSaveSection('informacionFinanciera', 7)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+              <Button variant="contained" onClick={() => handleSaveSection('informacionFinanciera', 6)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
                 {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
               </Button>
             </Stack>
           </GlassCard>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={7}>
+        <TabPanel value={tabValue} index={6}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={2}>
               <Typography variant="h6">Pruebas</Typography>
@@ -2390,6 +2383,52 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
           <GlassCard sx={{ p: 3, mt: 3 }}>
             <Stack spacing={2}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar sx={{ bgcolor: alpha(tabsConfig[6].color, 0.1), color: tabsConfig[6].color }}>
+                  <AttachFileIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant="h6">Anexo REDAM</Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Puede ser una imagen o un PDF. Se anexa como última página del documento de anexos.
+                  </Typography>
+                </Box>
+              </Stack>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+                <Button
+                  variant="outlined"
+                  component="label"
+                  disabled={uploadingRedam}
+                  startIcon={uploadingRedam ? <CircularProgress size={20} /> : (redamUrl ? <CheckCircleIcon /> : <UploadFileIcon />)}
+                  color={redamUrl ? 'success' : 'primary'}
+                >
+                  {uploadingRedam ? 'Subiendo...' : (redamUrl ? 'REDAM subido' : 'Subir Anexo REDAM (imagen o PDF)')}
+                  <input type="file" accept="image/*,application/pdf,.pdf" hidden onChange={handleRedamChange} />
+                </Button>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {redamName || (redamUrl ? (redamTipo?.startsWith('image/') ? 'Imagen cargada' : 'PDF cargado') : 'Sin archivo (Opcional)')}
+                </Typography>
+                {redamUrl && (
+                  <Box
+                    component="img"
+                    src={redamUrl}
+                    alt="Anexo REDAM"
+                    sx={{
+                      width: '100%',
+                      maxHeight: 180,
+                      objectFit: 'contain',
+                      borderRadius: '12px',
+                      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                      display: redamTipo?.startsWith('image/') ? 'block' : 'none',
+                    }}
+                  />
+                )}
+              </Stack>
+            </Stack>
+          </GlassCard>
+
+          <GlassCard sx={{ p: 3, mt: 3 }}>
+            <Stack spacing={2}>
               <Typography variant="h6">Anexos / Archivos Adjuntos</Typography>
               {anexosFields.map((field, index) => {
                 const isUploadingAnexo = uploadingAnexos[index];
@@ -2436,14 +2475,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                 );
               })}
               <Button variant="outlined" onClick={() => appendAnexo({ name: '', file: null, descripcion: '', url: '' })} startIcon={<AddIcon />}>Añadir Anexo</Button>
-              <Button variant="contained" onClick={() => handleSaveSection('anexos', 8)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+              <Button variant="contained" onClick={() => handleSaveSection('anexos', 7)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
                 {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
               </Button>
             </Stack>
           </GlassCard>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={8}>
+        <TabPanel value={tabValue} index={7}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={3}>
               <Typography variant="h6">Firma del Apoderado</Typography>

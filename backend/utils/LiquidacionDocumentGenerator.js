@@ -220,7 +220,6 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     acreencias = [],
     procesosJudiciales = [],
     informacionFinanciera = {},
-    entidadesFinancieras = [],
     pruebas = [],
     firma = {},
     anexos = [],
@@ -488,21 +487,11 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
 
   c.push(saltoDeLinea);
 
-  const entidadesCentrales = (entidadesFinancieras || [])
-    .map((e) => safe(e && e.nombre).toUpperCase())
-    .filter(Boolean);
-
-  let listaCentrales;
-  if (entidadesCentrales.length) {
-    listaCentrales = entidadesCentrales.map((nombre, i) => `${i + 1}. ${nombre}`);
-    listaCentrales.push(`${entidadesCentrales.length + 1}. Las demás centrales de riesgo, operadores, fuentes y usuarios de datos financieros, crediticios, comerciales y de servicios que registren obligaciones a nombre del deudor.`);
-  } else {
-    listaCentrales = [
-      '1. TRANSUNION COLOMBIA S.A. – CIFIN.',
-      '2. DATACRÉDITO EXPERIAN COLOMBIA S.A.',
-      '3. Las demás centrales de riesgo, operadores, fuentes y usuarios de datos financieros, crediticios, comerciales y de servicios que registren obligaciones a nombre del deudor.',
-    ];
-  }
+  const listaCentrales = [
+    '1. TRANSUNION COLOMBIA S.A. – CIFIN.',
+    '2. DATACRÉDITO EXPERIAN COLOMBIA S.A.',
+    '3. Las demás centrales de riesgo, operadores, fuentes y usuarios de datos financieros, crediticios, comerciales y de servicios que registren obligaciones a nombre del deudor.',
+  ];
   listaCentrales.forEach((item) => c.push(parrafo(item)));
 
   c.push(saltoDeLinea);

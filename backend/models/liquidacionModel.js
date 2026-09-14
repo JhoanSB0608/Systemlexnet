@@ -12,6 +12,7 @@ const anexoSchema = new mongoose.Schema({
   url: { type: String },
   descripcion: { type: String },
   size: { type: Number },
+  type: { type: String },
 });
 
 const firmaSchema = new mongoose.Schema({
@@ -114,10 +115,6 @@ const infoFinancieraSchema = new mongoose.Schema({
   tieneBienesEmbargables: { type: Boolean, default: false },
 });
 
-const entidadFinancieraSchema = new mongoose.Schema({
-  nombre: { type: String },
-});
-
 // -------------------- Esquema principal --------------------
 const liquidacionSchema = new mongoose.Schema(
   {
@@ -136,13 +133,13 @@ const liquidacionSchema = new mongoose.Schema(
     acreencias: [acreenciaSchema],
     procesosJudiciales: [procesoSchema],
     informacionFinanciera: infoFinancieraSchema,
-    entidadesFinancieras: [entidadFinancieraSchema],
     pruebas: [String],
     anexos: [anexoSchema],
     firma: firmaSchema,
     firmaDeudor: firmaSchema,
     bienesInventarioImagen: anexoSchema,
     certificacionLaboralImagen: anexoSchema,
+    redamArchivo: anexoSchema,
   },
   { timestamps: true }
 );

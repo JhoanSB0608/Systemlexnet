@@ -1,6 +1,9 @@
 const PdfPrinter = require('pdfmake');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
+const { PDFDocument } = require('pdf-lib');
 const {
   fetchUrlToDataUrl,
   safe,
@@ -49,6 +52,47 @@ const todayText = () => {
   const month = now.toLocaleDateString('es-CO', { month: 'long' });
   return `La presente certificación se expide a los ${day} días de ${month.toLowerCase()} de ${now.getFullYear()} por solicitud del interesado.`;
 };
+
+// Descarga un archivo remoto (relativo o absoluto) y devuelve un Buffer.
+function fetchUrlToBuffer(url) {
+  return new Promise((resolve) => {
+    const mod = url.startsWith('https:') ? https : http;
+    let settled = false;
+    const done = (value) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+    const req = mod.get(url, (res) => {
+      if (res.statusCode >= 400) {
+        res.resume();
+        return done(null);
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        done(buf.length ? buf : null);
+      });
+      res.on('error', () => done(null));
+    });
+    req.setTimeout(15000, () => {
+      req.destroy();
+      done(null);
+    });
+    req.on('error', () => done(null));
+  });
+}
+
+// Determina si un archivo REDAM es un PDF según su tipo MIME o extensión.
+function esRedamPdf(redam = {}) {
+  const tipo = String(redam.tipo || '').toLowerCase();
+  if (tipo.startsWith('image/')) return false;
+  if (tipo === 'application/pdf') return true;
+  const nombre = String(redam.name || '');
+  return /\.pdf$/i.test(nombre) || /\.pdf$/i.test(String(redam.url || ''));
+}
 
 const getAcreedorData = (a) => {
   if (!a) return null;
@@ -224,6 +268,7 @@ function buildAnexosDocDefinition(solicitud = {}) {
     firmaDeudor = {},
     bienesInventarioImagen = {},
     certificacionLaboralImagen = {},
+    redamArchivo = {},
   } = normalized;
 
   const nombreDeudor = nombreCompletoDeudor(deudor);
@@ -461,6 +506,19 @@ function buildAnexosDocDefinition(solicitud = {}) {
   c.push(parrafo(todayText(), 11, { margin: [0, 12, 0, 4] }));
   c.push(firmaDeudorBloque(deudor, firmaDeudor));
 
+  // ============ ANEXO REDAM (imagen) ============
+  // Si el REDAM es una imagen se incrusta en una sola página al final del
+  // documento de anexos. Si es un PDF se fusiona en generateLiquidacionAnexosPdf.
+  if (redamArchivo && redamArchivo.data && !esRedamPdf(redamArchivo)) {
+    c.push({
+      image: redamArchivo.data,
+      pageBreak: 'before',
+      alignment: 'center',
+      fit: [468, 660],
+      margin: [0, 12, 0, 12],
+    });
+  }
+
   return docDefinition;
 }
 
@@ -497,6 +555,12 @@ async function loadAnexosImages(solicitud = {}, baseUrl = '') {
   copy.bienesInventarioImagen = await download(copy.bienesInventarioImagen);
   copy.certificacionLaboralImagen = await download(copy.certificacionLaboralImagen);
 
+  // REDAM: si es imagen se carga como dataUrl (se renderiza en una página al
+  // final); si es PDF se conserva el url y se anexa por fusión PDF.
+  if (copy.redamArchivo && !esRedamPdf(copy.redamArchivo)) {
+    copy.redamArchivo = await download(copy.redamArchivo);
+  }
+
   return copy;
 }
 
@@ -505,7 +569,7 @@ async function generateLiquidacionAnexosPdf(solicitud = {}, baseUrl = '') {
   const data = await loadAnexosImages(solicitud, baseUrl);
   const docDefinition = buildAnexosDocDefinition(data);
 
-  return new Promise((resolve, reject) => {
+  const baseBuffer = await new Promise((resolve, reject) => {
     try {
       const printer = new PdfPrinter(FONTS);
       const pdfDoc = printer.createPdfKitDocument(docDefinition);
@@ -519,6 +583,37 @@ async function generateLiquidacionAnexosPdf(solicitud = {}, baseUrl = '') {
       reject(error);
     }
   });
+
+  // ============ FUSIÓN DEL ANEXO REDAM (PDF) ============
+  const redam = data.redamArchivo;
+  if (redam && esRedamPdf(redam) && redam.url) {
+    try {
+      let redamBuffer = null;
+      if (/^data:application\/pdf;base64,/i.test(redam.url)) {
+        redamBuffer = Buffer.from(redam.url.split(',')[1], 'base64');
+      } else if (/^https?:\/\//i.test(redam.url) || baseUrl) {
+        let url = redam.url;
+        if (!/^https?:\/\//i.test(url) && baseUrl) {
+          url = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
+        }
+        if (/^https?:\/\//i.test(url)) {
+          redamBuffer = await fetchUrlToBuffer(url);
+        }
+      }
+      if (redamBuffer) {
+        const mainDoc = await PDFDocument.load(baseBuffer);
+        const redamDoc = await PDFDocument.load(redamBuffer);
+        const pages = await mainDoc.copyPages(redamDoc, redamDoc.getPageIndices());
+        pages.forEach((page) => mainDoc.addPage(page));
+        return Buffer.from(await mainDoc.save());
+      }
+      console.warn('[Anexos] No se pudo descargar el PDF REDAM, se omite la fusión.');
+    } catch (error) {
+      console.error('[Anexos] Error al fusionar el PDF REDAM:', error);
+    }
+  }
+
+  return baseBuffer;
 }
 
 module.exports = { generateLiquidacionAnexosPdf, buildAnexosDocDefinition };
