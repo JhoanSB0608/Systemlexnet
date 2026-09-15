@@ -300,19 +300,33 @@ const updateBorrador = async (req, res) => {
     delete data.user;
     delete data._id;
     delete data.estado;
+    delete data.__v;
+    delete data.createdAt;
+    delete data.updatedAt;
 
     buildDeudorNombreCompleto(data.deudor);
     normalizeAcreedores(data);
-    borrador.set(data);
 
-    if ('anexos' in data) borrador.anexos = data.anexos || [];
-    if ('firma' in data) borrador.firma = data.firma;
-    if ('firmaDeudor' in data) borrador.firmaDeudor = data.firmaDeudor;
-    if ('bienesInventarioImagen' in data) borrador.bienesInventarioImagen = data.bienesInventarioImagen;
-    if ('certificacionLaboralImagen' in data) borrador.certificacionLaboralImagen = data.certificacionLaboralImagen;
-    if ('seccionesGuardadas' in data) borrador.seccionesGuardadas = data.seccionesGuardadas;
+    // Actualización atómica (último guardado gana). El autosave puede ejecutar
+    // múltiples requests casi en paralelo; con save() + control de versión
+    // optimista se producía VersionError. findByIdAndUpdate evita ese conflicto.
+    const patch = { ...data };
+    if ('anexos' in data) patch.anexos = data.anexos || [];
+    if ('firma' in data) patch.firma = data.firma;
+    if ('firmaDeudor' in data) patch.firmaDeudor = data.firmaDeudor;
+    if ('bienesInventarioImagen' in data) patch.bienesInventarioImagen = data.bienesInventarioImagen;
+    if ('certificacionLaboralImagen' in data) patch.certificacionLaboralImagen = data.certificacionLaboralImagen;
+    if ('seccionesGuardadas' in data) patch.seccionesGuardadas = data.seccionesGuardadas;
 
-    const saved = await borrador.save();
+    const saved = await Liquidacion.findByIdAndUpdate(
+      req.params.id,
+      { $set: patch },
+      { new: true, runValidators: true }
+    );
+
+    if (!saved) {
+      return res.status(404).json({ message: 'Borrador no encontrado' });
+    }
     res.json(saved);
   } catch (error) {
     console.error('Error al actualizar el borrador:', error);

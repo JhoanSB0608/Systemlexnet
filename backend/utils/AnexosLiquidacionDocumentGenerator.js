@@ -88,13 +88,14 @@ function fetchUrlToBuffer(url) {
   });
 }
 
-// Determina si un archivo REDAM es un PDF según su tipo MIME o extensión.
-function esRedamPdf(redam = {}) {
-  const tipo = String(redam.tipo || '').toLowerCase();
+// Determina si un archivo (REDAM, anexo 3 o anexo 6) es un PDF según su tipo
+// MIME (tipo/type) o la extensión del nombre/url.
+function esArchivoPdf(archivo = {}) {
+  const tipo = String(archivo.tipo || archivo.type || '').toLowerCase();
   if (tipo.startsWith('image/')) return false;
   if (tipo === 'application/pdf') return true;
-  const nombre = String(redam.name || '');
-  return /\.pdf$/i.test(nombre) || /\.pdf$/i.test(String(redam.url || ''));
+  const nombre = String(archivo.name || '');
+  return /\.pdf$/i.test(nombre) || /\.pdf$/i.test(String(archivo.url || ''));
 }
 
 const getAcreedorData = (a) => {
@@ -411,6 +412,8 @@ function buildAnexosDocDefinition(solicitud = {}) {
       alignment: 'center',
       margin: [0, 6, 0, 8],
     });
+  } else if (esArchivoPdf(bienesInventarioImagen)) {
+    c.push(parrafo('El inventario de bienes se adjunta como PDF al final de este documento.', 10, { italics: true, alignment: 'left', margin: [0, 8, 0, 4] }));
   }
   c.push(firmaDeudorBloque(deudor, firmaDeudor));
 
@@ -453,6 +456,8 @@ function buildAnexosDocDefinition(solicitud = {}) {
       alignment: 'center',
       margin: [0, 6, 0, 8],
     });
+  } else if (esArchivoPdf(certificacionLaboralImagen)) {
+    c.push(parrafo('La certificación laboral se adjunta como PDF al final de este documento.', 10, { italics: true, alignment: 'left', margin: [0, 8, 0, 4] }));
   }
   c.push(firmaDeudorBloque(deudor, firmaDeudor));
 
@@ -512,7 +517,7 @@ function buildAnexosDocDefinition(solicitud = {}) {
   // ============ ANEXO REDAM (imagen) ============
   // Si el REDAM es una imagen se incrusta en una sola página al final del
   // documento de anexos. Si es un PDF se fusiona en generateLiquidacionAnexosPdf.
-  if (redamArchivo && redamArchivo.data && !esRedamPdf(redamArchivo)) {
+  if (redamArchivo && redamArchivo.data && !esArchivoPdf(redamArchivo)) {
     c.push({
       image: redamArchivo.data,
       pageBreak: 'before',
@@ -555,12 +560,18 @@ async function loadAnexosImages(solicitud = {}, baseUrl = '') {
     }
   }
 
-  copy.bienesInventarioImagen = await download(copy.bienesInventarioImagen);
-  copy.certificacionLaboralImagen = await download(copy.certificacionLaboralImagen);
+  // Anexos 3 y 6: si son imágenes se cargan como dataUrl para incrustarlas en el
+  // PDF; si son PDF se conserva el url y se anexan por fusión PDF al final.
+  if (copy.bienesInventarioImagen && !esArchivoPdf(copy.bienesInventarioImagen)) {
+    copy.bienesInventarioImagen = await download(copy.bienesInventarioImagen);
+  }
+  if (copy.certificacionLaboralImagen && !esArchivoPdf(copy.certificacionLaboralImagen)) {
+    copy.certificacionLaboralImagen = await download(copy.certificacionLaboralImagen);
+  }
 
   // REDAM: si es imagen se carga como dataUrl (se renderiza en una página al
   // final); si es PDF se conserva el url y se anexa por fusión PDF.
-  if (copy.redamArchivo && !esRedamPdf(copy.redamArchivo)) {
+  if (copy.redamArchivo && !esArchivoPdf(copy.redamArchivo)) {
     copy.redamArchivo = await download(copy.redamArchivo);
   }
 
@@ -587,36 +598,45 @@ async function generateLiquidacionAnexosPdf(solicitud = {}, baseUrl = '') {
     }
   });
 
-  // ============ FUSIÓN DEL ANEXO REDAM (PDF) ============
-  const redam = data.redamArchivo;
-  if (redam && esRedamPdf(redam) && redam.url) {
+  // Descarga (o decodifica) el PDF de un archivo anexo y fusiona sus páginas
+  // al final del documento de anexos.
+  const appendPdf = async (buffer, archivo) => {
+    if (!archivo || !esArchivoPdf(archivo) || !archivo.url) return buffer;
     try {
-      let redamBuffer = null;
-      if (/^data:application\/pdf;base64,/i.test(redam.url)) {
-        redamBuffer = Buffer.from(redam.url.split(',')[1], 'base64');
-      } else if (/^https?:\/\//i.test(redam.url) || baseUrl) {
-        let url = redam.url;
+      let pdfBuffer = null;
+      if (/^data:application\/pdf;base64,/i.test(archivo.url)) {
+        pdfBuffer = Buffer.from(archivo.url.split(',')[1], 'base64');
+      } else if (/^https?:\/\//i.test(archivo.url) || baseUrl) {
+        let url = archivo.url;
         if (!/^https?:\/\//i.test(url) && baseUrl) {
           url = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
         }
         if (/^https?:\/\//i.test(url)) {
-          redamBuffer = await fetchUrlToBuffer(url);
+          pdfBuffer = await fetchUrlToBuffer(url);
         }
       }
-      if (redamBuffer) {
-        const mainDoc = await PDFDocument.load(baseBuffer);
-        const redamDoc = await PDFDocument.load(redamBuffer);
-        const pages = await mainDoc.copyPages(redamDoc, redamDoc.getPageIndices());
+      if (pdfBuffer) {
+        const mainDoc = await PDFDocument.load(buffer);
+        const pdfDoc = await PDFDocument.load(pdfBuffer);
+        const pages = await mainDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
         pages.forEach((page) => mainDoc.addPage(page));
         return Buffer.from(await mainDoc.save());
       }
-      console.warn('[Anexos] No se pudo descargar el PDF REDAM, se omite la fusión.');
+      console.warn('[Anexos] No se pudo descargar un PDF adjunto, se omite la fusión.');
+      return buffer;
     } catch (error) {
-      console.error('[Anexos] Error al fusionar el PDF REDAM:', error);
+      console.error('[Anexos] Error al fusionar un PDF adjunto:', error);
+      return buffer;
     }
-  }
+  };
 
-  return baseBuffer;
+  // Fusión de PDFs de anexos 3, 6 y REDAM en ese orden.
+  let result = baseBuffer;
+  result = await appendPdf(result, data.bienesInventarioImagen);
+  result = await appendPdf(result, data.certificacionLaboralImagen);
+  result = await appendPdf(result, data.redamArchivo);
+
+  return result;
 }
 
 module.exports = { generateLiquidacionAnexosPdf, buildAnexosDocDefinition };

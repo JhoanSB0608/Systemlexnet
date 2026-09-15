@@ -626,11 +626,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     if (!file) return;
     setUploading(true);
     try {
+      const mime = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
       const { fileUrl, uniqueFilename } = await uploadFile(file);
       setValue(`${path}.name`, uniqueFilename, { shouldValidate: true });
       setValue(`${path}.url`, fileUrl, { shouldValidate: true });
+      setValue(`${path}.tipo`, mime, { shouldValidate: true });
+      setValue(`${path}.type`, mime, { shouldValidate: true });
     } catch (error) {
-      console.error('Error subiendo imagen del anexo:', error);
+      console.error('Error subiendo archivo del anexo:', error);
       setError(`${path}.url`, { type: 'manual', message: 'Error al subir el archivo' });
     } finally {
       setUploading(false);
@@ -640,8 +643,12 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
   const imagenAnexo3Url = watch('bienesInventarioImagen.url');
   const imagenAnexo3Name = watch('bienesInventarioImagen.name');
+  const imagenAnexo3Tipo = watch('bienesInventarioImagen.tipo') || watch('bienesInventarioImagen.type');
+  const esImagenAnexo3Pdf = !!imagenAnexo3Tipo && !String(imagenAnexo3Tipo).startsWith('image/');
   const imagenAnexo6Url = watch('certificacionLaboralImagen.url');
   const imagenAnexo6Name = watch('certificacionLaboralImagen.name');
+  const imagenAnexo6Tipo = watch('certificacionLaboralImagen.tipo') || watch('certificacionLaboralImagen.type');
+  const esImagenAnexo6Pdf = !!imagenAnexo6Tipo && !String(imagenAnexo6Tipo).startsWith('image/');
 
   const redamUrl = watch('redamArchivo.url');
   const redamName = watch('redamArchivo.name');
@@ -2359,9 +2366,9 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
           <GlassCard sx={{ p: 3, mt: 3 }}>
             <Stack spacing={2}>
-              <Typography variant="h6">Anexo 3 y Anexo 6: Imágenes</Typography>
+              <Typography variant="h6">Anexo 3 y Anexo 6: Archivos</Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Suba la imagen del inventario de bienes (Anexo 3) y la certificación laboral de ingresos (Anexo 6).
+                Suba el inventario de bienes (Anexo 3) y la certificación laboral de ingresos (Anexo 6). Pueden ser imágenes o PDFs.
               </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
@@ -2373,13 +2380,13 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                       startIcon={uploadingImagenAnexo3 ? <CircularProgress size={20} /> : (imagenAnexo3Url ? <CheckCircleIcon /> : <UploadFileIcon />)}
                       color={imagenAnexo3Url ? 'success' : 'primary'}
                     >
-                      {uploadingImagenAnexo3 ? 'Subiendo...' : (imagenAnexo3Url ? 'Anexo 3 subido' : 'Subir imagen Anexo 3 (Inventario)')}
-                      <input type="file" accept="image/*" hidden onChange={handleImagenAnexoChange('bienesInventarioImagen', setUploadingImagenAnexo3)} />
+                      {uploadingImagenAnexo3 ? 'Subiendo...' : (imagenAnexo3Url ? 'Anexo 3 subido' : 'Subir Anexo 3 (Inventario)')}
+                      <input type="file" accept="image/*,application/pdf,.pdf" hidden onChange={handleImagenAnexoChange('bienesInventarioImagen', setUploadingImagenAnexo3)} />
                     </Button>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {imagenAnexo3Name || (imagenAnexo3Url ? "Imagen cargada" : 'Sin imagen (Opcional)')}
+                      {imagenAnexo3Name || (imagenAnexo3Url ? (esImagenAnexo3Pdf ? 'PDF cargado' : "Imagen cargada") : 'Sin archivo (Opcional)')}
                     </Typography>
-                    {imagenAnexo3Url && (
+                    {imagenAnexo3Url && !esImagenAnexo3Pdf && (
                       <Box
                         component="img"
                         src={imagenAnexo3Url}
@@ -2398,13 +2405,13 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                       startIcon={uploadingImagenAnexo6 ? <CircularProgress size={20} /> : (imagenAnexo6Url ? <CheckCircleIcon /> : <UploadFileIcon />)}
                       color={imagenAnexo6Url ? 'success' : 'primary'}
                     >
-                      {uploadingImagenAnexo6 ? 'Subiendo...' : (imagenAnexo6Url ? 'Anexo 6 subido' : 'Subir imagen Anexo 6 (Cert. Laboral)')}
-                      <input type="file" accept="image/*" hidden onChange={handleImagenAnexoChange('certificacionLaboralImagen', setUploadingImagenAnexo6)} />
+                      {uploadingImagenAnexo6 ? 'Subiendo...' : (imagenAnexo6Url ? 'Anexo 6 subido' : 'Subir Anexo 6 (Cert. Laboral)')}
+                      <input type="file" accept="image/*,application/pdf,.pdf" hidden onChange={handleImagenAnexoChange('certificacionLaboralImagen', setUploadingImagenAnexo6)} />
                     </Button>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {imagenAnexo6Name || (imagenAnexo6Url ? "Imagen cargada" : 'Sin imagen (Opcional)')}
+                      {imagenAnexo6Name || (imagenAnexo6Url ? (esImagenAnexo6Pdf ? 'PDF cargado' : "Imagen cargada") : 'Sin archivo (Opcional)')}
                     </Typography>
-                    {imagenAnexo6Url && (
+                    {imagenAnexo6Url && !esImagenAnexo6Pdf && (
                       <Box
                         component="img"
                         src={imagenAnexo6Url}
