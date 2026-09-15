@@ -1,5 +1,11 @@
-const API_URL = process.env.REACT_APP_GCS_API_URL || process.env.REACT_APP_BACKEND_URL || 'https://gcs-signed-urls-20536909632.us-central1.run.app';
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+import { API_BASE_URL } from './userService';
+
+const API_URL = process.env.REACT_APP_GCS_API_URL || 'https://gcs-signed-urls-20536909632.us-central1.run.app';
+// El respaldo local SIEMPRE debe apuntar al backend real de la app (la misma
+// URL que usa el resto de los servicios). Nunca debe derivar de la URL del
+// servicio de firmas GCS. Este era el bug: REACT_APP_BACKEND_URL apuntaba al
+// Cloud Run de GCS y el respaldo /api/files/upload golpeaba un servicio caído.
+const BACKEND_URL = API_BASE_URL;
 console.log("fileStorageService API_URL:", API_URL, "| BACKEND_URL:", BACKEND_URL);
 
 const getToken = () => {
