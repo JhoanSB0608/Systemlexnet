@@ -18,7 +18,7 @@ const {
 
 // ---------------------------------------------------------------------------
 // Generador de la PLANTILLA DE ANEXOS de la Liquidación Patrimonial Directa:
-// 8 anexos con la estructura del documento de muestra (PlantillaAnexos.pdf).
+// 9 anexos con la estructura del documento de muestra (PlantillaAnexos.pdf).
 // Anexo 3 (bienes) y Anexo 6 (certificación laboral) incorporan la imagen
 // subida en el formulario; en todos los anexos firma el DEUDOR.
 // ---------------------------------------------------------------------------
@@ -34,7 +34,17 @@ const FONTS = {
     italics: tryFile('times-italic.ttf') || tryFile('calibri-italic.ttf') || tryFile('Roboto-Italic.ttf') || '',
     bolditalics: tryFile('times-bolditalic.ttf') || tryFile('calibri-bold-italic.ttf') || tryFile('Roboto-BoldItalic.ttf') || '',
   },
+  // Anexo 9: el documento de muestra usa Arial/Helvetica 12 (fuente sans),
+  // distinta del Times del resto de los anexos.
+  Helvetica: {
+    normal: 'Helvetica',
+    bold: 'Helvetica-Bold',
+    italics: 'Helvetica-Oblique',
+    bolditalics: 'Helvetica-BoldOblique',
+  },
 };
+
+const SANS = 'Helvetica';
 
 const PAGE_WIDTH = 612;
 const MARGIN = 72;
@@ -55,6 +65,79 @@ const todayText = () => {
   const month = now.toLocaleDateString('es-CO', { month: 'long' });
   return `La presente certificación se expide a los ${day} días de ${month.toLowerCase()} de ${now.getFullYear()} por solicitud del interesado.`;
 };
+
+// -------------------- Fechas en letras (Anexo 9) --------------------
+const UNIDADES_PALABRA = [
+  'cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve',
+  'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete',
+  'dieciocho', 'diecinueve', 'veinte', 'veintiuno', 'veintidós', 'veintitrés',
+  'veinticuatro', 'veinticinco', 'veintiséis', 'veintisiete', 'veintiocho',
+  'veintinueve', 'treinta',
+];
+
+const DECENAS_PALABRA = {
+  30: 'treinta', 40: 'cuarenta', 50: 'cincuenta', 60: 'sesenta',
+  70: 'setenta', 80: 'ochenta', 90: 'noventa',
+};
+
+const numeroBajoPalabra = (n) => {
+  const num = Math.floor(Math.abs(Number(n) || 0));
+  if (num <= 30) return UNIDADES_PALABRA[num];
+  const decena = Math.floor(num / 10) * 10;
+  const unidad = num % 10;
+  const base = DECENAS_PALABRA[decena] || String(num);
+  return unidad ? `${base} y ${UNIDADES_PALABRA[unidad]}` : base;
+};
+
+// Apócopes usados antes de la palabra "días": un, veintiún, treinta y un, ...
+const palabraDia = (n) => {
+  const w = numeroBajoPalabra(n);
+  if (w === 'uno') return 'un';
+  if (w === 'veintiuno') return 'veintiún';
+  if (w.endsWith('uno')) return `${w.slice(0, -3)}un`;
+  return w;
+};
+
+const CENTENAS_PALABRA = {
+  100: 'cien', 200: 'doscientos', 300: 'trescientos', 400: 'cuatrocientos',
+  500: 'quinientos', 600: 'seiscientos', 700: 'setecientos',
+  800: 'ochocientos', 900: 'novecientos',
+};
+
+// Número en palabras (0 - 999), en minúsculas.
+const numeroPalabra = (n) => {
+  const num = Math.floor(Math.abs(Number(n) || 0));
+  if (num <= 99) return numeroBajoPalabra(num);
+  const centena = Math.floor(num / 100) * 100;
+  const resto = num % 100;
+  const cabeza = centena === 100
+    ? (resto > 0 ? 'ciento' : 'cien')
+    : (CENTENAS_PALABRA[centena] || '');
+  return resto ? `${cabeza} ${numeroBajoPalabra(resto)}` : cabeza;
+};
+
+const anioEnPalabras = (anio) => {
+  const y = Math.floor(Number(anio) || 0);
+  if (y >= 2000 && y <= 2099) {
+    const resto = y - 2000;
+    return resto === 0 ? 'dos mil' : `dos mil ${numeroPalabra(resto)}`;
+  }
+  if (y >= 1900 && y <= 1999) {
+    return `mil ${numeroPalabra(y - 1000)}`;
+  }
+  return numeroPalabra(y);
+};
+
+// "Se expide en Cúcuta, a los veintiún (21) días del mes de septiembre de dos
+// mil veintiséis (2026)."
+const fechaEnLetras = (lugar, fecha = new Date()) => {
+  const d = (fecha instanceof Date && !isNaN(fecha.getTime())) ? fecha : new Date();
+  const dia = d.getDate();
+  const mes = d.toLocaleDateString('es-CO', { month: 'long' }).toLowerCase();
+  const anio = d.getFullYear();
+  return `Se expide en ${lugar}, a los ${palabraDia(dia)} (${dia}) ${dia === 1 ? 'día' : 'días'} del mes de ${mes} de ${anioEnPalabras(anio)} (${anio}).`;
+};
+
 
 // Descarga un archivo remoto (relativo o absoluto) y devuelve un Buffer.
 function fetchUrlToBuffer(url) {
@@ -261,13 +344,157 @@ function procesoBloque(proceso = {}, index) {
   };
 }
 
+const getAcreedoresMap = (acreencias = []) => {
+  const map = {};
+  acreencias.forEach((a) => {
+    const ac = getAcreedorData(a);
+    if (ac && ac._id) map[String(ac._id)] = ac;
+  });
+  return map;
+};
+
+const nombresAcreedores = (b, lookup = {}) => {
+  const acs = b && b.acreedores;
+  if (!acs) return [];
+  const entries = acs instanceof Map ? Array.from(acs.entries()) : Object.entries(acs || {});
+  return entries
+    .filter(([, v]) => v === true || v === 'true')
+    .map(([id]) => {
+      const ac = lookup[String(id)];
+      return ac && ac.nombre ? ac.nombre : String(id);
+    });
+};
+
+const garantiasActivas = (b) => {
+  const items = [];
+  if (b.leasing) items.push('Leasing');
+  if (b.prenda) items.push('Prenda');
+  if (b.garantiaMobiliaria) items.push('Garantía Mobiliaria');
+  if (b.pactoRetroventa) items.push('Pacto de Retroventa');
+  return items;
+};
+
+const complementoTexto = (b) => {
+  const partes = [];
+  if (b.tipoComplemento) partes.push(b.tipoComplemento);
+  if (b.categoria) partes.push(b.categoria);
+  if (b.descripcionComplemento) partes.push(b.descripcionComplemento);
+  return partes.join(' – ');
+};
+
+function bienMuebleBloque(b = {}, idx, lookup = {}) {
+  const filas = [
+    ['Descripción', safe(b.descripcion) || 'No reporta'],
+    ['Clasificación', safe(b.clasificacion) || 'No reporta'],
+    ['Marca', safe(b.marca) || 'No reporta'],
+  ];
+  if (String(b.clasificacion || '').toLowerCase() === 'vehiculo' || String(b.tipoBienMueble || '') === 'Vehículos') {
+    filas.push(['Modelo', safe(b.modelo) || 'No reporta']);
+    filas.push(['Placa', safe(b.placa) || 'No reporta']);
+    filas.push(['Tarjeta de Propiedad', safe(b.tarjetaPropiedad) || 'No reporta']);
+    filas.push(['Oficina de Tránsito', safe(b.oficinaTransito) || 'No reporta']);
+  }
+  filas.push(['Avalúo Comercial Estimado', Number(b.avaluoComercial) > 0 ? formatCifra(b.avaluoComercial) : 'Se desconoce esta información']);
+  filas.push(['Afectaciones, Gravámenes y Medidas Cautelares', complementoTexto(b) || 'Ninguna']);
+
+  const garantias = garantiasActivas(b);
+  const acreedores = nombresAcreedores(b, lookup);
+  filas.push(['Garantías', garantias.length ? garantias.join(', ') : 'Ninguna']);
+  if (acreedores.length) {
+    filas.push(['Acreedores', acreedores.join(', ')]);
+  }
+
+  return {
+    stack: [
+      {
+        table: {
+          widths: ['34%', '66%'],
+          body: [
+            [
+              {
+                text: `Bien Mueble No. ${idx + 1}`,
+                colSpan: 2,
+                alignment: 'center',
+                bold: true,
+                fontSize: 10,
+              },
+              {},
+            ],
+            ...filas.map(([k, v]) => [
+              { text: k, fontSize: 9 },
+              { text: v, fontSize: 9 },
+            ]),
+          ],
+        },
+        layout: tableLayout,
+      },
+    ],
+    margin: [0, idx > 0 ? 10 : 8, 0, 0],
+  };
+}
+
+function bienInmuebleBloque(b = {}, idx, lookup = {}) {
+  const garantias = garantiasActivas(b);
+  const acreedores = nombresAcreedores(b, lookup);
+  const filas = [
+    ['Descripción', safe(b.descripcion) || 'No reporta'],
+    ['Matrícula Inmobiliaria', safe(b.matricula) || 'No reporta'],
+    ['Escritura Pública', safe(b.escrituraPublica) || 'No reporta'],
+    ['Dirección', safe(b.direccion) || 'No reporta'],
+    ['País', safe(b.pais) || 'Colombia'],
+    ['Departamento', safe(b.departamento) || 'No reporta'],
+    ['Ciudad', safe(b.ciudad) || 'No reporta'],
+    ['Porcentaje de Participación', safe(b.porcentajeParticipacion) || 'No reporta'],
+    ['Avalúo Catastral', Number(b.avaluoCatastral) > 0 ? formatCifra(b.avaluoCatastral) : 'Se desconoce esta información'],
+    ['Avalúo Comercial Estimado', Number(b.avaluoComercial) > 0 ? formatCifra(b.avaluoComercial) : 'Se desconoce esta información'],
+    ['Afectado a Vivienda Familiar', b.afectadoViviendaFamiliar === true || b.afectadoViviendaFamiliar === 'true' ? 'SI' : 'NO'],
+    ['Afectaciones, Gravámenes y Medidas Cautelares', complementoTexto(b) || 'Ninguna'],
+    ['Garantías', garantias.length ? garantias.join(', ') : 'Ninguna'],
+  ];
+  if (acreedores.length) {
+    filas.push(['Acreedores', acreedores.join(', ')]);
+  }
+
+  return {
+    stack: [
+      {
+        table: {
+          widths: ['34%', '66%'],
+          body: [
+            [
+              {
+                text: `Bien Inmueble No. ${idx + 1}`,
+                colSpan: 2,
+                alignment: 'center',
+                bold: true,
+                fontSize: 10,
+              },
+              {},
+            ],
+            ...filas.map(([k, v]) => [
+              { text: k, fontSize: 9 },
+              { text: v, fontSize: 9 },
+            ]),
+          ],
+        },
+        layout: tableLayout,
+      },
+    ],
+    margin: [0, idx > 0 ? 10 : 8, 0, 0],
+  };
+}
+
 // -------------------- Definición del documento --------------------
 function buildAnexosDocDefinition(solicitud = {}) {
   const normalized = (solicitud && typeof solicitud.toObject === 'function') ? solicitud.toObject() : solicitud;
   const {
+    sede = {},
     deudor = {},
     acreencias = [],
     procesosJudiciales = [],
+    bienesMuebles = [],
+    bienesInmuebles = [],
+    noPoseeBienes = false,
     informacionFinanciera = {},
     firmaDeudor = {},
     bienesInventarioImagen = {},
@@ -396,14 +623,45 @@ function buildAnexosDocDefinition(solicitud = {}) {
 
   // ============ ANEXO 3 ============
   c.push(tituloAnexo(3, 'RELACIÓN E INVENTARIO DE LOS BIENES MUEBLES E INMUEBLES'));
-  c.push(parrafo(
-    `${suscrito(deudor.genero)}, ${deudorIntro} actuando en nombre propio certifico bajo la gravedad de juramento que no poseo bienes muebles o inmuebles para adjudicar.`
-  ));
-  c.push(parrafo('Se presenta una relación completa y detallada de los bienes muebles e inmuebles:'));
-  c.push(parrafo('Bienes Muebles', 11, { bold: true, alignment: 'left', margin: [0, 8, 0, 2] }));
-  c.push(parrafo('Se manifiesta bajo la gravedad de juramento que no se poseen Bienes Muebles.'));
-  c.push(parrafo('Bienes Inmuebles', 11, { bold: true, alignment: 'left', margin: [0, 8, 0, 2] }));
-  c.push(parrafo('Se manifiesta bajo la gravedad de juramento que no se poseen Bienes Inmuebles.'));
+  const tieneBienes = (bienesMuebles.length > 0) || (bienesInmuebles.length > 0);
+  const acreedoresLookup = getAcreedoresMap(acreencias);
+
+  const noPosee = noPoseeBienes === true || noPoseeBienes === 'true';
+  if (noPosee || !tieneBienes) {
+    c.push(parrafo(
+      `${suscrito(deudor.genero)}, ${deudorIntro} actuando en nombre propio certifico bajo la gravedad de juramento que no poseo bienes muebles o inmuebles para adjudicar.`
+    ));
+    c.push(parrafo('Se manifiesta bajo la gravedad de juramento que no se poseen bienes muebles o inmuebles.'));
+  } else {
+    c.push(parrafo('Se presenta una relación completa y detallada de los bienes muebles e inmuebles:'));
+
+    c.push(parrafo('Bienes Muebles', 11, { bold: true, alignment: 'left', margin: [0, 8, 0, 2] }));
+    if (bienesMuebles.length === 0) {
+      c.push(parrafo('Se manifiesta bajo la gravedad de juramento que no se poseen Bienes Muebles.'));
+    } else {
+      bienesMuebles.forEach((b, idx) => {
+        c.push(bienMuebleBloque(b, idx, acreedoresLookup));
+      });
+      const totalMuebles = bienesMuebles.reduce((s, b) => s + (Number(b.avaluoComercial) || 0), 0);
+      if (totalMuebles > 0) {
+        c.push(parrafo(`Total Avalúo Comercial Estimado de Bienes Muebles: ${formatCifra(totalMuebles)}`, 11, { bold: true, alignment: 'left', margin: [0, 6, 0, 4] }));
+      }
+    }
+
+    c.push(parrafo('Bienes Inmuebles', 11, { bold: true, alignment: 'left', margin: [0, 8, 0, 2] }));
+    if (bienesInmuebles.length === 0) {
+      c.push(parrafo('Se manifiesta bajo la gravedad de juramento que no se poseen Bienes Inmuebles.'));
+    } else {
+      bienesInmuebles.forEach((b, idx) => {
+        c.push(bienInmuebleBloque(b, idx, acreedoresLookup));
+      });
+      const totalInmuebles = bienesInmuebles.reduce((s, b) => s + (Number(b.avaluoComercial) || 0), 0);
+      if (totalInmuebles > 0) {
+        c.push(parrafo(`Total Avalúo Comercial Estimado de Bienes Inmuebles: ${formatCifra(totalInmuebles)}`, 11, { bold: true, alignment: 'left', margin: [0, 6, 0, 4] }));
+      }
+    }
+  }
+
   if (bienesInventarioImagen && bienesInventarioImagen.data) {
     c.push(parrafo('Inventario de bienes:', 11, { bold: true, alignment: 'left', margin: [0, 10, 0, 2] }));
     c.push({
@@ -513,6 +771,59 @@ function buildAnexosDocDefinition(solicitud = {}) {
   ));
   c.push(parrafo(todayText(), 11, { margin: [0, 12, 0, 4] }));
   c.push(firmaDeudorBloque(deudor, firmaDeudor));
+
+  // ============ ANEXO 9 ============
+  // Manifestación bajo la gravedad de juramento – inexistencia de codeudores,
+  // fiadores, avalistas y cesionarios. Fuente Arial/Helvetica 12 con interlínea
+  // 1.4 (como el documento de muestra), a diferencia del Times de los anexos
+  // 1 a 8. El `characterSpacing` negativo reproduce el kerning del original y
+  // por tanto los mismos cortes de línea de los párrafos justificados.
+  const ANEXO9 = { font: SANS, fontSize: 12, lineHeight: 1.43 };
+  const ANEXO9_KERN = -0.077;
+
+  const anexo9Parrafo = (text, margin = [0, 0, 0, 11.05]) => ({
+    text,
+    ...ANEXO9,
+    alignment: 'justify',
+    characterSpacing: ANEXO9_KERN,
+    margin,
+  });
+
+  c.push({
+    stack: [
+      { text: 'ANEXO N.º 9', ...ANEXO9, bold: true, alignment: 'center', margin: [0, 0, 0, 10.05] },
+      { text: 'MANIFESTACIÓN BAJO LA GRAVEDAD DE JURAMENTO', ...ANEXO9, bold: true, alignment: 'center', margin: [0, 0, 0, 10.05] },
+      { text: 'INEXISTENCIA DE CODEUDORES, FIADORES, AVALISTAS Y CESIONARIOS', ...ANEXO9, bold: true, alignment: 'center', margin: [0, 0, 0, 0] },
+    ],
+    pageBreak: 'before',
+    margin: [0, 14.1, 0, 0],
+  });
+
+  c.push(anexo9Parrafo(
+    `${nombreDeudor}, ${identificado(deudor.genero)} con cédula de ciudadanía n.º ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}, actuando en nombre propio y en mi calidad de persona natural no comerciante, manifiesto bajo la gravedad de juramento que:`,
+    [0, 36.6, 0, 11.05]
+  ));
+  c.push(anexo9Parrafo(
+    'Las obligaciones relacionadas en mi solicitud de liquidación patrimonial no cuentan con codeudores, fiadores ni avalistas. En consecuencia, no existen personas que deban ser identificadas en tales calidades, ni nombres, domicilios o direcciones de oficina o lugar de habitación que deba suministrar por dichos conceptos. Aclaro que esta manifestación corresponde a la inexistencia de tales personas y no al desconocimiento de sus datos de identificación o ubicación.'
+  ));
+  c.push(anexo9Parrafo(
+    'Asimismo, manifiesto bajo la gravedad de juramento que no existen cesionarios de las acreencias relacionadas en la solicitud de liquidación patrimonial.'
+  ));
+  c.push(anexo9Parrafo(
+    'Certifico que lo aquí manifestado es veraz y corresponde a la situación de las obligaciones informadas en el proceso.'
+  ));
+  c.push(anexo9Parrafo(
+    fechaEnLetras(safe(deudor.ciudad) || safe(sede.ciudad) || 'esta ciudad'),
+    [0, 0, 0, 0]
+  ));
+
+  c.push({ text: '_'.repeat(40), ...ANEXO9, margin: [0, 50.4, 0, 0] });
+  c.push({ text: nombreDeudor, ...ANEXO9, bold: true, margin: [0, 1.9, 0, 0] });
+  c.push({
+    text: `C. C. n.º ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`,
+    ...ANEXO9,
+    margin: [0, 0.9, 0, 0],
+  });
 
   // ============ ANEXO REDAM (imagen) ============
   // Si el REDAM es una imagen se incrusta en una sola página al final del

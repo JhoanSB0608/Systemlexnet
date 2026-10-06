@@ -75,6 +75,12 @@ const FONTS = {
     bold: tryFile('Verdana-Bold.ttf') || 'Helvetica-Bold',
     italics: 'Helvetica-Oblique',
     bolditalics: 'Helvetica-BoldOblique'
+  },
+  Times: {
+    normal: tryFile('times-regular.ttf') || 'Helvetica',
+    bold: tryFile('times-bold.ttf') || 'Helvetica-Bold',
+    italics: tryFile('times-italic.ttf') || 'Helvetica-Oblique',
+    bolditalics: tryFile('times-bolditalic.ttf') || 'Helvetica-BoldOblique'
   }
 };
 
@@ -418,10 +424,170 @@ function buildPoderDocDefinition(data = {}) {
     content: [...c1, ...c2]
   };
 }
+
+// ---------------------------------------------------------------------------
+// PODER ESPECIAL PARA LIQUIDACIÓN PATRIMONIAL DIRECTA (Ley 2445 de 2025).
+// Layout medido sobre "PODER LIQUIDACION DIRECTA - MANUEL ENRIQUE CASTILLO
+// HERRERAdocx.pdf": página LETTER (612x792), Times New Roman 12pt, línea de
+// 13.8pt, margen izquierdo 85.2, derecho 82 y superior ~71.
+// ---------------------------------------------------------------------------
+const LIQ_PAGE = { width: 612, height: 792 };
+const LIQ_LEFT = 85.2;
+const LIQ_RIGHT = 82;
+const LIQ_TOP = 71;
+const LIQ_BOTTOM = 71;
+const LIQ_FAC_HANG = 103.2 - 85.2;        // 18: número a 103.2
+const LIQ_FAC_TEXT = 121.2 - 85.2;        // 36: texto (continuaciones) a 121.2
+const LIQ_CONTENT_WIDTH = LIQ_PAGE.width - LIQ_LEFT - LIQ_RIGHT; // 444.8
+const LIQ_FAC_COL = LIQ_CONTENT_WIDTH - LIQ_FAC_HANG - (LIQ_FAC_TEXT - LIQ_FAC_HANG); // 408.8
+
+const textoPorGenero = {
+  masculino: { articulo: 'el abogado', ident: 'identificado', portador: 'portador' },
+  femenino: { articulo: 'la abogada', ident: 'identificada', portador: 'portadora' },
+};
+
+const FACULTADES_LIQUIDACION = [
+  { lead: 'Presentar solicitud de liquidación patrimonial directa', rest: ' ante el juzgado civil competente, con cumplimiento de los requisitos del artículo 539 del Código General del Proceso, excepto lo previsto en el numeral 2 y el parágrafo del artículo 539A, conforme al artículo 9 de la Ley 2445 de 2025.' },
+  { lead: 'Aportar y suscribir', rest: ' toda la documentación requerida, incluyendo: informe de causas de la cesación de pagos, relación de acreedores, relación de bienes (si los hubiere), relación de procesos judiciales, certificación de ingresos, información sobre sociedad conyugal o patrimonial, discriminación de obligaciones alimentarias, y constancia de matrícula mercantil (si aplica).' },
+  { lead: 'Recibir notificaciones', rest: ' personales, por estado y por aviso que se decreten dentro del proceso.' },
+  { lead: 'Solicitar y recibir', rest: ' autos, providencias y demás actuaciones judiciales.' },
+  { lead: 'Intervenir en todas las audiencias', rest: ' que se programen, incluyendo la audiencia de adjudicación de bienes.' },
+  { lead: 'Proponer, aceptar o rechazar', rest: ' acuerdos resolutorios, planes de pago, o cualquier otra forma de solución dentro del proceso.' },
+  { lead: 'Objetar y contradecir', rest: ' acreencias, inventarios, avalúos y proyectos de adjudicación.' },
+  { lead: 'Solicitar la designación de liquidador', rest: ' y ejercer control sobre su gestión.' },
+  { lead: 'Pedir y recibir', rest: ' copias, certificaciones y constancias de todo el expediente.' },
+  { lead: 'Solicitar el descargue', rest: ' de las obligaciones no cubiertas una vez culminado el proceso.' },
+  { lead: 'Interponer recursos', rest: ' (reposición, apelación, queja) contra las providencias que se profieran.' },
+  { lead: 'Sustituir este poder', rest: ' total o parcialmente en uno o varios abogados, facultad que podrá ejercerse en cualquier momento.' },
+  { lead: 'Realizar cualquier otra gestión', rest: ' judicial, administrativa o registral que sea necesaria para culminar exitosamente el trámite de liquidación patrimonial directa.' },
+];
+
+function buildPoderLiquidacionDocDefinition(data = {}) {
+  const { destinatario, poderdante, apoderado, firma, firmaApoderado } = data;
+
+  const toSignatureImage = (sig) => {
+    if (!sig || typeof sig !== 'object') return null;
+    if (typeof sig.data === 'string' && /^data:image\//i.test(sig.data)) return sig.data;
+    return null;
+  };
+  const sigPod = toSignatureImage(firma);
+  const sigApo = toSignatureImage(firmaApoderado);
+
+  const nombrePod = (poderdante?.nombre || '').trim();
+  const cedulaPod = poderdante?.cedula || '';
+  const ciuExpPod = poderdante?.ciudadExpedicion || '';
+  const domicilio = poderdante?.domicilio || '';
+  const municipio = poderdante?.municipio || '';
+  const departamento = poderdante?.departamento || '';
+  const correoPod = poderdante?.correo || '';
+
+  const generoApo = (apoderado?.genero || 'femenino').toLowerCase();
+  const probApo = textoPorGenero[generoApo] || textoPorGenero.femenino;
+  const nombreApo = (apoderado?.nombre || '').trim();
+  const cedulaApo = apoderado?.cedula || '';
+  const ciuExpApo = [apoderado?.ciudadExpedicion, apoderado?.departamentoExpedicion].filter(Boolean).join(', ') || apoderado?.ciudadExpedicion || '';
+  const tpApo = apoderado?.tarjetaProfesional || '';
+  const dirApo = apoderado?.direccion || '';
+  const emailApo = apoderado?.email || '';
+  const telApo = apoderado?.telefono || '';
+
+  const juzgado = (destinatario?.entidad || '').toUpperCase();
+
+  const M = (text, bold = false) => ({ text, ...(bold ? { bold: true } : {}) });
+
+  const body = [
+    { text: 'Yo, ' },
+    { text: nombrePod + ',', bold: true },
+    { text: ' mayor de edad, identificado(a) con cédula de ciudadanía No. ' },
+    { text: cedulaPod, bold: true },
+    { text: ' expedida en ' },
+    { text: ciuExpPod + ',', bold: true },
+    { text: ' domiciliado(a) en ' },
+    { text: domicilio + ',', bold: true },
+    { text: ' municipio de ' },
+    { text: municipio + ',', bold: true },
+    { text: ' departamento de ' },
+    { text: departamento + ',', bold: true },
+    { text: ' en pleno uso de mis facultades legales y de conformidad con lo dispuesto en los artículos 2142 y siguientes del Código Civil colombiano, ' },
+    { text: 'OTORGO PODER ESPECIAL, amplio, cumplido y bastante, ', bold: true },
+    { text: `a favor de ${probApo.articulo} ` },
+    { text: nombreApo + ',', bold: true },
+    { text: ` mayor de edad, ${probApo.ident} con cédula de ciudadanía No. ` },
+    { text: cedulaApo, bold: true },
+    { text: ' expedida en ' },
+    { text: ciuExpApo + ',', bold: true },
+    { text: ` ${probApo.portador} de la Tarjeta Profesional No. ` },
+    { text: tpApo, bold: true },
+    { text: ' expedida por el Consejo Superior de la Judicatura, con domicilio profesional en ' },
+    { text: dirApo + ',', bold: true },
+    { text: ' correo electrónico ' },
+    { text: emailApo, bold: true },
+    { text: ' y teléfono ' },
+    { text: telApo + ',', bold: true },
+    { text: ' para que en mi nombre y representación realice todas las gestiones necesarias para tramitar el proceso de ' },
+    { text: 'LIQUIDACIÓN PATRIMONIAL DIRECTA', bold: true },
+    { text: ' de que trata la ' },
+    { text: 'Ley 2445 de 2025', bold: true },
+    { text: ' (modificatoria del Título IV de la Ley 1564 de 2012), incluyendo las siguientes facultades:' },
+  ];
+
+  const faculties = FACULTADES_LIQUIDACION.map((f, i) => ({
+    columns: [
+      { width: LIQ_FAC_TEXT - LIQ_FAC_HANG, text: `${i + 1}.` },
+      { width: LIQ_FAC_COL, text: [M(f.lead, true), M(f.rest)], alignment: 'justify' },
+    ],
+    margin: [LIQ_FAC_HANG, 0, 0, 8],
+  }));
+
+  return {
+    pageSize: LIQ_PAGE,
+    pageMargins: [LIQ_LEFT, LIQ_TOP, LIQ_RIGHT, LIQ_BOTTOM],
+    defaultStyle: { font: 'Times', fontSize: 12, lineHeight: 1.03862 },
+    content: [
+      { text: 'Señor:', bold: true },
+      { text: juzgado, margin: [0, 0, 0, 8] },
+      { text: 'E. S. D.', margin: [0, 0, 0, 29.8] },
+      { text: 'REFERENCIA: PODER ESPECIAL PARA TRAMITAR PROCESO DE LIQUIDACIÓN PATRIMONIAL DIRECTA (LEY 2445 DE 2025)', bold: true, margin: [0, 0, 0, 29.8] },
+      { text: body, alignment: 'justify', margin: [0, 0, 0, 29.8] },
+      ...faculties,
+      {
+        text: 'Este poder es ESPECIAL y se limita exclusivamente al trámite de liquidación patrimonial directa aquí descrito, conforme a la Ley 2445 de 2025 y el Decreto 1136 de 2025. No comprende actos de disposición que excedan el marco de la liquidación, ni faculta al apoderado para celebrar aquellos actos que conforme a la ley deban constar en instrumento público con facultades específicas adicionales.',
+        alignment: 'justify', margin: [0, 0, 0, 8],
+      },
+      {
+        text: 'El presente poder tendrá vigencia desde la fecha de su otorgamiento hasta la culminación total del proceso de liquidación patrimonial directa, incluyendo las gestiones de descargue y las que sean necesarias para la ejecución de lo ordenado en el auto de terminación.',
+        alignment: 'justify', margin: [0, 0, 0, 8],
+      },
+      { text: 'Atentamente,' },
+      { text: '\u00A0' },
+      ...(sigPod
+        ? [{ image: sigPod, fit: [150, 55], margin: [0, 6, 0, 10], alignment: 'left' }]
+        : [{ text: '\u00A0' }]),
+      { text: '\u00A0' },
+      { text: nombrePod, bold: true },
+      { text: `C.C. No. ${cedulaPod} expedida en ${ciuExpPod}` },
+      { text: `Correo electrónico: ${correoPod}` },
+      { text: '\u00A0' },
+      { text: 'ACEPTO EL PODER:', bold: true },
+      { text: '\u00A0' },
+      ...(sigApo
+        ? [{ image: sigApo, fit: [150, 55], margin: [0, 6, 0, 10], alignment: 'left' }]
+        : [{ text: '\u00A0' }]),
+      { text: '\u00A0' },
+      { text: nombreApo, bold: true },
+      { text: `C.C. No. ${cedulaApo} expedida en ${ciuExpApo}` },
+      { text: `TP ${tpApo} CSJ` },
+      { text: `Correo Electrónico: ${emailApo}` },
+    ],
+  };
+}
   
   async function generatePoderPdf(data = {}, options = {}) {
     const enriched = await loadFirmaImages(data, options.baseUrl);
-    const docDefinition = buildPoderDocDefinition(enriched);
+    const docDefinition =
+      enriched.tipo === 'liquidacion'
+        ? buildPoderLiquidacionDocDefinition(enriched)
+        : buildPoderDocDefinition(enriched);
     const printer = new PdfPrinter(FONTS);
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
     return new Promise((resolve, reject) => {
@@ -432,5 +598,5 @@ function buildPoderDocDefinition(data = {}) {
       pdfDoc.end();
     });
   }
-  
-  module.exports = { generatePoderPdf, buildPoderDocDefinition };
+
+  module.exports = { generatePoderPdf, buildPoderDocDefinition, buildPoderLiquidacionDocDefinition };

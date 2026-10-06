@@ -123,6 +123,7 @@ const formatDateForInput = (dateString) => {
 // Prepara los datos de un poder guardado/borrador para el form de react-hook-form.
 const buildFormattedData = (initialData) => ({
   ...initialData,
+  tipo: initialData.tipo || 'soat',
   destinatario: { ...(initialData.destinatario || {}) },
   poderdante: { ...(initialData.poderdante || {}), genero: initialData.poderdante?.genero || 'masculino' },
   apoderado: { ...(initialData.apoderado || {}) },
@@ -186,9 +187,10 @@ const PoderForm = ({ onSubmit, isUploading, initialData, isUpdating }) => {
 
   const { register, handleSubmit, control, watch, setValue, getValues, trigger, reset, formState: { errors } } = useForm({
     defaultValues: {
+      tipo: 'soat',
       destinatario: { entidad: 'SEGUROS MUNDIAL', ciudad: 'Giron' },
-      poderdante: { nombre: '', genero: 'masculino', cedula: '', ciudadExpedicion: '', departamentoExpedicion: '', ciudadResidencia: 'esta ciudad' },
-      apoderado: { nombre: 'MANUEL RICARDO MANCERA GARCIA', cedula: '1.090.442.371', ciudadExpedicion: 'Cúcuta', tarjetaProfesional: '316.220', cargo: 'ABOGADO ESPECIALISTA' },
+      poderdante: { nombre: '', genero: 'masculino', cedula: '', ciudadExpedicion: '', departamentoExpedicion: '', ciudadResidencia: 'esta ciudad', domicilio: '', municipio: '', departamento: '', correo: '' },
+      apoderado: { nombre: 'MANUEL RICARDO MANCERA GARCIA', cedula: '1.090.442.371', ciudadExpedicion: 'Cúcuta', tarjetaProfesional: '316.220', cargo: 'ABOGADO ESPECIALISTA', genero: 'femenino', departamentoExpedicion: '', direccion: '', email: '', telefono: '' },
       siniestro: { aseguradora: 'SEGUROS MUNDIAL', poliza: '', fecha: '', tipoProceso: 'RECLAMACION DE INDEMNIZACION POR ACCIDENTE DE TRANSITO', ley: 'ley 780 del 2016' },
       firma: { source: 'draw', data: null, file: null },
       firmaApoderado: { source: 'draw', data: null, file: null }
@@ -227,6 +229,8 @@ const PoderForm = ({ onSubmit, isUploading, initialData, isUpdating }) => {
 
   const watchedFirmaSource = watch('firma.source');
   const watchedFirmaApoSource = watch('firmaApoderado.source');
+  const watchedTipo = watch('tipo');
+  const esLiquidacion = watchedTipo === 'liquidacion';
 
   // Mantener signatureSource en sync con el valor del formulario
   useEffect(() => {
@@ -433,7 +437,9 @@ const PoderForm = ({ onSubmit, isUploading, initialData, isUpdating }) => {
         fieldsToValidate = ['destinatario.entidad', 'destinatario.ciudad'];
         break;
       case 'partes':
-        fieldsToValidate = ['poderdante.nombre', 'poderdante.cedula', 'apoderado.nombre'];
+        fieldsToValidate = esLiquidacion
+          ? ['poderdante.nombre', 'poderdante.cedula', 'poderdante.domicilio', 'poderdante.municipio', 'poderdante.departamento', 'poderdante.correo', 'apoderado.nombre', 'apoderado.cedula', 'apoderado.tarjetaProfesional', 'apoderado.direccion', 'apoderado.email', 'apoderado.telefono']
+          : ['poderdante.nombre', 'poderdante.cedula', 'apoderado.nombre'];
         break;
       case 'siniestro':
         fieldsToValidate = ['siniestro.poliza', 'siniestro.fecha'];
@@ -553,13 +559,20 @@ const PoderForm = ({ onSubmit, isUploading, initialData, isUpdating }) => {
 
   const completionPercentage = (Object.values(savedSections).filter(Boolean).length / Object.values(savedSections).length) * 100;
 
-  const tabsConfig = [
-    { key: 'destinatario', label: 'Destinatario', icon: BusinessIcon, color: '#2196f3' },
-    { key: 'partes', label: 'Partes (Poderdante/Apoderado)', icon: PersonIcon, color: '#673ab7' },
-    { key: 'siniestro', label: 'Detalles Siniestro', icon: AssignmentIcon, color: '#ff5722' },
-    { key: 'firmaPoderdante', label: 'Firma Poderdante', icon: CreateIcon, color: '#795548' },
-    { key: 'firmaApoderado', label: 'Firma Apoderado', icon: CreateIcon, color: '#00897b' },
-  ];
+  const tabsConfig = esLiquidacion
+    ? [
+        { key: 'destinatario', label: 'Destinatario', icon: BusinessIcon, color: '#2196f3' },
+        { key: 'partes', label: 'Partes (Poderdante/Apoderado)', icon: PersonIcon, color: '#673ab7' },
+        { key: 'firmaPoderdante', label: 'Firma Poderdante', icon: CreateIcon, color: '#795548' },
+        { key: 'firmaApoderado', label: 'Firma Apoderado', icon: CreateIcon, color: '#00897b' },
+      ]
+    : [
+        { key: 'destinatario', label: 'Destinatario', icon: BusinessIcon, color: '#2196f3' },
+        { key: 'partes', label: 'Partes (Poderdante/Apoderado)', icon: PersonIcon, color: '#673ab7' },
+        { key: 'siniestro', label: 'Detalles Siniestro', icon: AssignmentIcon, color: '#ff5722' },
+        { key: 'firmaPoderdante', label: 'Firma Poderdante', icon: CreateIcon, color: '#795548' },
+        { key: 'firmaApoderado', label: 'Firma Apoderado', icon: CreateIcon, color: '#00897b' },
+      ];
 
   return (
     <Box>
@@ -628,6 +641,20 @@ const PoderForm = ({ onSubmit, isUploading, initialData, isUpdating }) => {
           </Stack>
         </GlassCard>
       )}
+
+      <GlassCard sx={{ mb: 3 }}><Box p={3}>
+        <Typography variant="h6" sx={{ mb: 2 }}>Tipo de Poder</Typography>
+        <Controller
+          name="tipo"
+          control={control}
+          render={({ field }) => (
+            <RadioGroup {...field} row>
+              <FormControlLabel value="soat" control={<Radio />} label="SOAT" />
+              <FormControlLabel value="liquidacion" control={<Radio />} label="Liquidación Patrimonial Directa" />
+            </RadioGroup>
+          )}
+        />
+      </Box></GlassCard>
 
       <GlassCard sx={{ mb: 3 }}>
         <Tabs
@@ -706,6 +733,14 @@ const PoderForm = ({ onSubmit, isUploading, initialData, isUpdating }) => {
               <Grid item xs={12} sm={6}><GlassTextField {...register('poderdante.cedula', { required: 'Requerido' })} label="Cédula" fullWidth error={!!errors.poderdante?.cedula} helperText={errors.poderdante?.cedula?.message} /></Grid>
               <Grid item xs={12} sm={6}><GlassTextField {...register('poderdante.ciudadExpedicion')} label="Ciudad de Expedición (Ej: Giron)" fullWidth /></Grid>
               <Grid item xs={12} sm={6}><GlassTextField {...register('poderdante.departamentoExpedicion')} label="Depto. Expedición (Ej: Santander)" fullWidth /></Grid>
+              {esLiquidacion && (
+                <>
+                  <Grid item xs={12} sm={6}><GlassTextField {...register('poderdante.domicilio')} label="Domicilio" fullWidth /></Grid>
+                  <Grid item xs={12} sm={6}><GlassTextField {...register('poderdante.municipio')} label="Municipio" fullWidth /></Grid>
+                  <Grid item xs={12} sm={6}><GlassTextField {...register('poderdante.departamento')} label="Departamento" fullWidth /></Grid>
+                  <Grid item xs={12} sm={6}><GlassTextField {...register('poderdante.correo')} label="Correo Electrónico" fullWidth /></Grid>
+                </>
+              )}
             </Grid>
 
             <Typography variant="h6" sx={{ mt: 2 }}>Datos del Apoderado (Pre-llenados)</Typography>
@@ -715,6 +750,29 @@ const PoderForm = ({ onSubmit, isUploading, initialData, isUpdating }) => {
               <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.cedula')} label="Cédula Abogado" fullWidth /></Grid>
               <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.tarjetaProfesional')} label="Tarjeta Profesional" fullWidth /></Grid>
               <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.ciudadExpedicion')} label="Expedición Cédula Abogado" fullWidth /></Grid>
+              {esLiquidacion && (
+                <>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Género Apoderado</InputLabel>
+                      <Controller
+                        name="apoderado.genero"
+                        control={control}
+                        render={({ field }) => (
+                          <Select {...field} label="Género Apoderado" sx={selectSx}>
+                            <MenuItem value="femenino">Femenino</MenuItem>
+                            <MenuItem value="masculino">Masculino</MenuItem>
+                          </Select>
+                        )}
+                      />
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.departamentoExpedicion')} label="Depto. Expedición" fullWidth /></Grid>
+                  <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.direccion')} label="Dirección" fullWidth /></Grid>
+                  <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.email')} label="Email" fullWidth /></Grid>
+                  <Grid item xs={12} sm={6}><GlassTextField {...register('apoderado.telefono')} label="Teléfono" fullWidth /></Grid>
+                </>
+              )}
             </Grid>
             <Button variant="contained" onClick={() => handleSaveSection('partes', 2)} disabled={isSaving} startIcon={isSaving ? null : <SaveIcon />}>
               {isSaving ? 'Guardando...' : 'Guardar y Continuar'}

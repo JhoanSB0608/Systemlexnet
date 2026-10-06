@@ -83,6 +83,49 @@ const acreenciaSchema = new mongoose.Schema({
   fechaVencimiento: { type: Date },
 });
 
+// Esquemas replicados del de insolvencia (solicitudModel.js) para el Anexo 3.
+const bienMuebleSchema = new mongoose.Schema({
+  tipoBienMueble: { type: String },
+  clasificacion: { type: String },
+  descripcion: { type: String },
+  marca: { type: String },
+  modelo: { type: String },
+  placa: { type: String },
+  tarjetaPropiedad: { type: String },
+  oficinaTransito: { type: String },
+  avaluoComercial: { type: Number, default: 0 },
+  tipoComplemento: { type: String },
+  categoria: { type: String },
+  descripcionComplemento: { type: String },
+  leasing: { type: Boolean },
+  prenda: { type: Boolean },
+  garantiaMobiliaria: { type: Boolean },
+  pactoRetroventa: { type: Boolean },
+  acreedores: { type: Map, of: Boolean },
+});
+
+const bienInmuebleSchema = new mongoose.Schema({
+  descripcion: { type: String },
+  matricula: { type: String },
+  escrituraPublica: { type: String },
+  avaluoCatastral: { type: Number, default: 0 },
+  direccion: { type: String },
+  ciudad: { type: String },
+  departamento: { type: String },
+  pais: { type: String },
+  porcentajeParticipacion: { type: String },
+  avaluoComercial: { type: Number, default: 0 },
+  afectadoViviendaFamiliar: { type: Boolean, default: false },
+  tipoComplemento: { type: String },
+  categoria: { type: String },
+  descripcionComplemento: { type: String },
+  leasing: { type: Boolean },
+  prenda: { type: Boolean },
+  garantiaMobiliaria: { type: Boolean },
+  pactoRetroventa: { type: Boolean },
+  acreedores: { type: Map, of: Boolean },
+});
+
 const procesoSchema = new mongoose.Schema({
   tipoProceso: { type: String },
   juzgado: { type: String },
@@ -134,6 +177,9 @@ const liquidacionSchema = new mongoose.Schema(
     apoderado: apoderadoSchema,
     acreencias: [acreenciaSchema],
     procesosJudiciales: [procesoSchema],
+    bienesMuebles: [bienMuebleSchema],
+    bienesInmuebles: [bienInmuebleSchema],
+    noPoseeBienes: { type: Boolean, default: false },
     informacionFinanciera: infoFinancieraSchema,
     pruebas: [String],
     anexos: [anexoSchema],

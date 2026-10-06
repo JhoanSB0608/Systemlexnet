@@ -7,6 +7,9 @@ const mongoose = require('mongoose');
 const poderSchema = mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    // Tipo de poder: 'soat' (PODER AMPLIO, ESPECIAL Y SUFICIENTE - reclamación
+    // SOAT) o 'liquidacion' (PODER ESPECIAL PARA LIQUIDACIÓN PATRIMONIAL DIRECTA).
+    tipo: { type: String, enum: ['soat', 'liquidacion'], default: 'soat' },
     destinatario: {
       nombre: { type: String, default: '' },
       cargo: { type: String, default: '' },
@@ -20,13 +23,24 @@ const poderSchema = mongoose.Schema(
       ciudadExpedicion: { type: String, default: '' },
       departamentoExpedicion: { type: String, default: '' },
       ciudadResidencia: { type: String, default: '' },
+      // Campos del PODER DE LIQUIDACIÓN PATRIMONIAL DIRECTA
+      domicilio: { type: String, default: '' },
+      municipio: { type: String, default: '' },
+      departamento: { type: String, default: '' },
+      correo: { type: String, default: '' },
     },
     apoderado: {
       nombre: { type: String, default: '' },
+      genero: { type: String, default: '' },
       cedula: { type: String, default: '' },
       ciudadExpedicion: { type: String, default: '' },
+      departamentoExpedicion: { type: String, default: '' },
       tarjetaProfesional: { type: String, default: '' },
       cargo: { type: String, default: '' },
+      // Campos del PODER DE LIQUIDACIÓN PATRIMONIAL DIRECTA
+      direccion: { type: String, default: '' },
+      email: { type: String, default: '' },
+      telefono: { type: String, default: '' },
     },
     siniestro: {
       aseguradora: { type: String, default: '' },

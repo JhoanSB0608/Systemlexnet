@@ -5,7 +5,7 @@ import {
   FormControlLabel, Tooltip, FormControl, InputLabel, Select, MenuItem, FormHelperText,
   alpha, useTheme, Stack, Avatar, IconButton, Chip, LinearProgress, Collapse,
   Alert, Badge, RadioGroup, Radio, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, CircularProgress,
-  Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow
+  Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch
 } from '@mui/material';
 import {
   LocationCity as LocationCityIcon,
@@ -30,7 +30,8 @@ import {
   Warning as WarningIcon,
   Verified as VerifiedIcon,
   Info as InfoIcon,
-  AttachMoney as AttachMoneyIcon
+  AttachMoney as AttachMoneyIcon,
+  Home as HomeIcon
 } from '@mui/icons-material';
 import ReactSelect from "react-select";
 import { useQuery } from '@tanstack/react-query';
@@ -210,6 +211,13 @@ const buildFormattedData = (initialData) => ({
     ...p,
     valor: p.valor ?? '',
   })),
+  bienesMuebles: initialData.bienesMuebles?.map((b) => ({
+    ...b,
+    tipoBienMueble: b.tipoBienMueble || '',
+    clasificacion: b.clasificacion || '',
+  })),
+  bienesInmuebles: initialData.bienesInmuebles || [],
+  noPoseeBienes: initialData.noPoseeBienes ?? false,
   pruebas: initialData.pruebas?.length ? initialData.pruebas : [...PRUEBAS_PREDETERMINADAS],
   informacionFinanciera: {
     gastosPersonales: {},
@@ -287,6 +295,9 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         email: '', telefono: '', departamento: '', ciudad: '', noComerciante: true,
         sociedadConyugalActiva: false, nombreConyuge: '', cedulaConyuge: '', ciudadExpedicionConyuge: '',
       },
+      bienesMuebles: [],
+      bienesInmuebles: [],
+      noPoseeBienes: false,
       apoderado: { nombreCompleto: '', genero: '', cedula: '', ciudadExpedicion: '', tp: '', direccion: '', email: '', telefono: '' },
       acreencias: [],
       procesosJudiciales: [],
@@ -314,6 +325,8 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
   const { fields: procesosFields, append: appendProceso, remove: removeProceso } = useFieldArray({ control, name: 'procesosJudiciales' });
   const { fields: obligacionesFields, append: appendObligacion, remove: removeObligacion } = useFieldArray({ control, name: 'informacionFinanciera.obligacionesAlimentarias' });
   const { fields: anexosFields, append: appendAnexo, remove: removeAnexo } = useFieldArray({ control, name: 'anexos' });
+  const { fields: bienesMueblesFields, append: appendBienMueble, remove: removeBienMueble } = useFieldArray({ control, name: 'bienesMuebles' });
+  const { fields: bienesInmueblesFields, append: appendBienInmueble, remove: removeBienInmueble } = useFieldArray({ control, name: 'bienesInmuebles' });
 
   const updateGastosPersonasCargo = () => {
     const obligaciones = getValues('informacionFinanciera.obligacionesAlimentarias');
@@ -365,6 +378,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     apoderado: false,
     acreencias: false,
     procesosJudiciales: false,
+    bienes: false,
     informacionFinanciera: false,
     anexos: false,
     firma: false,
@@ -476,7 +490,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       } else {
         setSavedSections({
           sede: true, deudor: true, apoderado: true, acreencias: true,
-          procesosJudiciales: true, informacionFinanciera: true, anexos: true, firma: true,
+          procesosJudiciales: true, bienes: true, informacionFinanciera: true, anexos: true, firma: true,
         });
       }
       finish();
@@ -554,6 +568,30 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
   const acreenciasValues = watch('acreencias');
   const totalAcreencias = (acreenciasValues || []).reduce((s, a) => s + (Number(a.capital) || 0), 0);
+
+  const watchedBienesMuebles = watch('bienesMuebles');
+  useEffect(() => {
+    watchedBienesMuebles?.forEach((field, index) => {
+      if (field) {
+        const { leasing, prenda, garantiaMobiliaria, pactoRetroventa } = field;
+        if (!leasing && !prenda && !garantiaMobiliaria && !pactoRetroventa) {
+          setValue(`bienesMuebles.${index}.acreedores`, {});
+        }
+      }
+    });
+  }, [watchedBienesMuebles, setValue]);
+
+  const watchedBienesInmuebles = watch('bienesInmuebles');
+  useEffect(() => {
+    watchedBienesInmuebles?.forEach((field, index) => {
+      if (field) {
+        const { leasing, prenda, garantiaMobiliaria, pactoRetroventa } = field;
+        if (!leasing && !prenda && !garantiaMobiliaria && !pactoRetroventa) {
+          setValue(`bienesInmuebles.${index}.acreedores`, {});
+        }
+      }
+    });
+  }, [watchedBienesInmuebles, setValue]);
 
   const totalCapital = (acreenciasValues || []).reduce((sum, a) => sum + (parseFloat(a.capital) || 0), 0) || 0;
   const obligacionesEnMora = (acreenciasValues || []).filter(a => a.creditoEnMora === true && a.moraMas90Dias === true);
@@ -733,6 +771,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       case 'apoderado': fieldsToValidate = ['apoderado']; break;
       case 'acreencias': fieldsToValidate = ['acreencias']; break;
       case 'procesosJudiciales': fieldsToValidate = ['procesosJudiciales']; break;
+      case 'bienes': fieldsToValidate = ['bienesMuebles', 'bienesInmuebles', 'noPoseeBienes']; break;
       case 'informacionFinanciera': fieldsToValidate = ['informacionFinanciera']; break;
       case 'anexos': fieldsToValidate = ['anexos']; break;
       case 'firma': fieldsToValidate = ['firma', 'firmaDeudor']; break;
@@ -870,6 +909,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         apoderado: false,
         acreencias: false,
         procesosJudiciales: false,
+        bienes: false,
         informacionFinanciera: false,
         anexos: false,
         firma: false,
@@ -905,7 +945,8 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     { key: 'apoderado', label: 'Apoderado', icon: GavelIcon, color: '#ff9800' },
     { key: 'acreencias', label: 'Acreencias', icon: ReceiptIcon, color: '#ff5722' },
     { key: 'procesosJudiciales', label: 'Procesos', icon: AccountBalanceIcon, color: '#f44336' },
-    { key: 'informacionFinanciera', label: 'Financiera', icon: TrendingUpIcon, color: '#4caf50' },
+    { key: 'bienes', label: 'Bienes', icon: HomeIcon, color: '#4caf50' },
+    { key: 'informacionFinanciera', label: 'Financiera', icon: TrendingUpIcon, color: '#00897b' },
     { key: 'anexos', label: 'Pruebas', icon: AttachFileIcon, color: '#009688' },
     { key: 'firma', label: 'Firma', icon: CreateIcon, color: '#795548' },
   ];
@@ -1097,6 +1138,19 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       </GlassCard>
 
       <form onSubmit={handleSubmit(customOnSubmit, onInvalid)}>
+        <Controller
+          name="bienesMuebles"
+          control={control}
+          rules={{
+            validate: (value) => {
+              if (getValues("noPoseeBienes")) {
+                return true;
+              }
+              return (value && value.length > 0) || "Debe agregar al menos un bien mueble si no ha marcado la opción de no poseer bienes.";
+            },
+          }}
+          render={() => null}
+        />
         <TabPanel value={tabValue} index={0}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={3}>
@@ -1994,10 +2048,626 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={5}>
+          <GlassCard>
+            <Box sx={{ p: 3 }}>
+              <Stack spacing={3}>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Avatar sx={{ bgcolor: alpha(tabsConfig[5].color, 0.1), color: tabsConfig[5].color }}>
+                    <HomeIcon />
+                  </Avatar>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Bienes
+                  </Typography>
+                </Stack>
+
+                {/* Declaración de no poseer bienes */}
+                <GlassCard hover={false} sx={{ border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}` }}>
+                  <Box sx={{ p: 2 }}>
+                    <FormControlLabel
+                      control={<Controller
+                        name="noPoseeBienes"
+                        control={control}
+                        render={({ field }) => (
+                          <Checkbox
+                            {...field}
+                            checked={field.value}
+                            sx={{
+                              color: theme.palette.warning.main,
+                              '&.Mui-checked': {
+                                color: theme.palette.warning.main,
+                              },
+                            }} />
+                        )} />}
+                      label={<Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        Manifiesto bajo la gravedad de juramento que no poseo bienes sujetos a registro
+                      </Typography>} />
+                  </Box>
+                </GlassCard>
+
+                {/* Bienes Muebles */}
+                <Box>
+                  <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Bienes Muebles
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      onClick={() => appendBienMueble({})}
+                      startIcon={<AddIcon />}
+                      size="small"
+                      sx={{
+                        borderRadius: '12px',
+                        borderColor: alpha(tabsConfig[5].color, 0.3),
+                        color: tabsConfig[5].color,
+                        '&:hover': {
+                          borderColor: tabsConfig[5].color,
+                          background: alpha(tabsConfig[5].color, 0.1),
+                        },
+                      }}
+                    >
+                      Agregar
+                    </Button>
+                  </Stack>
+
+                  {errors.bienesMuebles && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {errors.bienesMuebles.root?.message || errors.bienesMuebles.message}
+                    </Alert>
+                  )}
+
+                  {bienesMueblesFields.length === 0 ? (
+                    <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+                      <Typography variant="body2">No hay bienes muebles agregados</Typography>
+                    </Box>
+                  ) : (
+                    <Stack spacing={2}>
+                      {bienesMueblesFields.map((field, index) => (
+                        <Box key={field.id}>
+                          <GlassCard sx={{ border: `1px solid ${alpha(tabsConfig[5].color, 0.2)}` }}>
+                            <Box sx={{ p: 2 }}>
+                              <Stack spacing={2}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                  <Chip
+                                    label={`Bien Mueble #${index + 1}`}
+                                    size="small"
+                                    sx={{
+                                      background: alpha(tabsConfig[5].color, 0.1),
+                                      color: tabsConfig[5].color,
+                                      fontWeight: 600,
+                                    }} />
+                                  <IconButton
+                                    onClick={() => removeBienMueble(index)}
+                                    size="small"
+                                    sx={{
+                                      color: theme.palette.error.main,
+                                      '&:hover': { background: alpha(theme.palette.error.main, 0.1) },
+                                    }}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Stack>
+
+                                <Grid container spacing={2}>
+                                  <Grid item xs={12} sm={6}>
+                                    <FormControl fullWidth>
+                                      <InputLabel>Tipo de Bien Mueble</InputLabel>
+                                      <Controller
+                                        name={`bienesMuebles.${index}.tipoBienMueble`}
+                                        control={control}
+                                        defaultValue=""
+                                        render={({ field }) => (
+                                          <Select
+                                            {...field}
+                                            label="Tipo de Bien Mueble"
+                                            sx={selectSx}
+                                            onChange={(e) => {
+                                              field.onChange(e);
+                                              if (e.target.value === 'Vehículos') {
+                                                setValue(`bienesMuebles.${index}.clasificacion`, 'Vehiculo');
+                                              } else {
+                                                setValue(`bienesMuebles.${index}.clasificacion`, '');
+                                              }
+                                            }}
+                                          >
+                                            <MenuItem value="Vehículos">Vehículos</MenuItem>
+                                            <MenuItem value="Otros Muebles">Otros Muebles</MenuItem>
+                                          </Select>
+                                        )}
+                                      />
+                                    </FormControl>
+                                  </Grid>
+                                  <Grid item xs={12} sm={6}>
+                                    <FormControl fullWidth>
+                                      <InputLabel>Clasificación</InputLabel>
+                                      <Controller
+                                        name={`bienesMuebles.${index}.clasificacion`}
+                                        control={control}
+                                        defaultValue=""
+                                        render={({ field }) => (
+                                          <Select
+                                            {...field}
+                                            label="Clasificación"
+                                            sx={selectSx}
+                                            disabled={watch(`bienesMuebles.${index}.tipoBienMueble`) === 'Vehículos'}
+                                          >
+                                            <MenuItem value="Vehiculo">Vehiculo</MenuItem>
+                                            <MenuItem value="Equipos Electrónicos">Equipos Electrónicos</MenuItem>
+                                            <MenuItem value="Joyas">Joyas</MenuItem>
+                                            <MenuItem value="Obras de Arte">Obras de Arte</MenuItem>
+                                            <MenuItem value="Artículos de Recreación">Artículos de Recreación</MenuItem>
+                                            <MenuItem value="Accesorios">Accesorios</MenuItem>
+                                            <MenuItem value="Prendas de Vestir">Prendas de Vestir</MenuItem>
+                                            <MenuItem value="Semovientes">Semovientes</MenuItem>
+                                            <MenuItem value="Muebles y Enseres">Muebles y Enseres</MenuItem>
+                                            <MenuItem value="Otros">Otros</MenuItem>
+                                          </Select>
+                                        )}
+                                      />
+                                    </FormControl>
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <GlassTextField
+                                      {...register(`bienesMuebles.${index}.descripcion`, { required: 'Campo requerido' })}
+                                      label="Descripción"
+                                      fullWidth
+                                      error={!!errors.bienesMuebles?.[index]?.descripcion}
+                                      helperText={errors.bienesMuebles?.[index]?.descripcion?.message} />
+                                  </Grid>
+                                  <Grid item xs={6} sm={4}>
+                                    <GlassTextField
+                                      {...register(`bienesMuebles.${index}.marca`, { required: 'Campo requerido' })}
+                                      label="Marca"
+                                      fullWidth
+                                      error={!!errors.bienesMuebles?.[index]?.marca} />
+                                  </Grid>
+                                  {watch(`bienesMuebles.${index}.tipoBienMueble`) === 'Vehículos' && (
+                                    <>
+                                      <Grid item xs={6} sm={4}>
+                                        <GlassTextField
+                                          {...register(`bienesMuebles.${index}.modelo`, { required: 'Campo requerido' })}
+                                          label="Modelo"
+                                          fullWidth
+                                          error={!!errors.bienesMuebles?.[index]?.modelo} />
+                                      </Grid>
+                                      <Grid item xs={6} sm={4}>
+                                        <GlassTextField
+                                          {...register(`bienesMuebles.${index}.placa`, { required: 'Campo requerido' })}
+                                          label="Placa"
+                                          fullWidth
+                                          error={!!errors.bienesMuebles?.[index]?.placa} />
+                                      </Grid>
+                                      <Grid item xs={6} sm={4}>
+                                        <GlassTextField
+                                          {...register(`bienesMuebles.${index}.tarjetaPropiedad`, { required: 'Campo requerido' })}
+                                          label="Tarjeta de Propiedad"
+                                          fullWidth
+                                          error={!!errors.bienesMuebles?.[index]?.tarjetaPropiedad} />
+                                      </Grid>
+                                      <Grid item xs={6} sm={4}>
+                                        <GlassTextField
+                                          {...register(`bienesMuebles.${index}.oficinaTransito`, { required: 'Campo requerido' })}
+                                          label="Oficina de Tránsito"
+                                          fullWidth
+                                          error={!!errors.bienesMuebles?.[index]?.oficinaTransito} />
+                                      </Grid>
+                                    </>
+                                  )}
+                                  <Grid item xs={6} sm={4}>
+                                    <GlassTextField
+                                      {...register(`bienesMuebles.${index}.avaluoComercial`, { required: 'Campo requerido' })}
+                                      label="Avalúo Comercial Estimado"
+                                      type="number"
+                                      fullWidth
+                                      sx={{ minWidth: 250, }}
+                                      error={!!errors.bienesMuebles?.[index]?.avaluoComercial} />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle1">Afectaciones, Gravámenes y Medidas Cautelares:</Typography>
+                                  </Grid>
+                                  <Grid item xs={12} sm={6}>
+                                    <FormControl fullWidth>
+                                      <InputLabel>Tipo de Complemento</InputLabel>
+                                      <Controller
+                                        name={`bienesMuebles.${index}.tipoComplemento`}
+                                        control={control}
+                                        defaultValue=""
+                                        render={({ field }) => (
+                                          <Select
+                                            {...field}
+                                            label="Tipo de Complemento"
+                                            sx={selectSx}
+                                          >
+                                            <MenuItem value="Afectación">Afectación</MenuItem>
+                                            <MenuItem value="Gravámen">Gravámen</MenuItem>
+                                            <MenuItem value="Medida cautelar">Medida cautelar</MenuItem>
+                                          </Select>
+                                        )}
+                                      />
+                                    </FormControl>
+                                  </Grid>
+                                  {watch(`bienesMuebles.${index}.tipoComplemento`) && (
+                                    <Grid item xs={12} sm={6}>
+                                      <FormControl fullWidth>
+                                        <InputLabel>Categoría</InputLabel>
+                                        <Controller
+                                          name={`bienesMuebles.${index}.categoria`}
+                                          control={control}
+                                          defaultValue=""
+                                          render={({ field }) => (
+                                            <Select
+                                              {...field}
+                                              label="Categoría"
+                                              sx={selectSx}
+                                            >
+                                              {watch(`bienesMuebles.${index}.tipoComplemento`) === 'Afectación' && [
+                                                <MenuItem value="Anticresis">Anticresis</MenuItem>,
+                                                <MenuItem value="Arriendo">Arriendo</MenuItem>,
+                                                <MenuItem value="Patrimonio Familiar">Patrimonio Familiar</MenuItem>,
+                                                <MenuItem value="Servidumbre">Servidumbre</MenuItem>,
+                                                <MenuItem value="Uso y habitación">Uso y habitación</MenuItem>,
+                                                <MenuItem value="Usufructo">Usufructo</MenuItem>,
+                                                <MenuItem value="Vivienda Familiar">Vivienda Familiar</MenuItem>
+                                              ]}
+                                              {watch(`bienesMuebles.${index}.tipoComplemento`) === 'Gravámen' && [
+                                                <MenuItem value="Hipotecario">Hipotecario</MenuItem>,
+                                                <MenuItem value="Prenda">Prenda</MenuItem>,
+                                                <MenuItem value="Propiedad Fiduciaria">Propiedad Fiduciaria</MenuItem>
+                                              ]}
+                                              {watch(`bienesMuebles.${index}.tipoComplemento`) === 'Medida cautelar' && [
+                                                <MenuItem value="Embargo">Embargo</MenuItem>,
+                                                <MenuItem value="Secuestro">Secuestro</MenuItem>
+                                              ]}
+                                            </Select>
+                                          )}
+                                        />
+                                      </FormControl>
+                                    </Grid>
+                                  )}
+                                  <Grid item xs={12}>
+                                    <GlassTextField
+                                      {...register(`bienesMuebles.${index}.descripcionComplemento`)}
+                                      label="Descripción del Complemento"
+                                      fullWidth
+                                      multiline
+                                      rows={2}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <GlassCard>
+                                      <Box sx={{ p: 2 }}>
+                                        <Stack spacing={1}>
+                                          <Typography variant="subtitle1">Garantías</Typography>
+                                          <FormControlLabel
+                                            control={<Switch {...register(`bienesMuebles.${index}.leasing`)} />}
+                                            label="Leasing"
+                                          />
+                                          <FormControlLabel
+                                            control={<Switch {...register(`bienesMuebles.${index}.prenda`)} />}
+                                            label="Prenda"
+                                          />
+                                          <FormControlLabel
+                                            control={<Switch {...register(`bienesMuebles.${index}.garantiaMobiliaria`)} />}
+                                            label="Garantía Mobiliaria"
+                                          />
+                                          <FormControlLabel
+                                            control={<Switch {...register(`bienesMuebles.${index}.pactoRetroventa`)} />}
+                                            label="Pacto Retroventa"
+                                          />
+                                          {(watch(`bienesMuebles.${index}.leasing`) || watch(`bienesMuebles.${index}.prenda`) || watch(`bienesMuebles.${index}.garantiaMobiliaria`) || watch(`bienesMuebles.${index}.pactoRetroventa`)) && (
+                                            <Box>
+                                              <Typography variant="subtitle1" sx={{ mt: 2 }}>Acreedores</Typography>
+                                              {acreedoresData?.rows
+                                                .filter(acreedor => acreenciasValues.some(a => a.acreedor === acreedor._id))
+                                                .map((acreedor) => (
+                                                  <FormControlLabel
+                                                    key={acreedor._id}
+                                                    control={<Checkbox {...register(`bienesMuebles.${index}.acreedores.${acreedor._id}`)} />}
+                                                    label={acreedor.nombre}
+                                                  />
+                                                ))}
+                                            </Box>
+                                          )}
+                                        </Stack>
+                                      </Box>
+                                    </GlassCard>
+                                  </Grid>
+                                </Grid>
+                              </Stack>
+                            </Box>
+                          </GlassCard>
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+                </Box>
+
+                {/* Bienes Inmuebles */}
+                <Box>
+                  <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Bienes Inmuebles
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      onClick={() => appendBienInmueble({})}
+                      startIcon={<AddIcon />}
+                      size="small"
+                      sx={{
+                        borderRadius: '12px',
+                        borderColor: alpha(tabsConfig[5].color, 0.3),
+                        color: tabsConfig[5].color,
+                        '&:hover': {
+                          borderColor: tabsConfig[5].color,
+                          background: alpha(tabsConfig[5].color, 0.1),
+                        },
+                      }}
+                    >
+                      Agregar
+                    </Button>
+                  </Stack>
+
+                  {bienesInmueblesFields.length === 0 ? (
+                    <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+                      <Typography variant="body2">No hay bienes inmuebles agregados</Typography>
+                    </Box>
+                  ) : (
+                    <Stack spacing={2}>
+                      {bienesInmueblesFields.map((field, index) => (
+                        <Box key={field.id}>
+                          <GlassCard sx={{ border: `1px solid ${alpha(tabsConfig[5].color, 0.2)}` }}>
+                            <Box sx={{ p: 2 }}>
+                              <Stack spacing={2}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                  <Chip
+                                    label={`Bien Inmueble #${index + 1}`}
+                                    size="small"
+                                    sx={{
+                                      background: alpha(tabsConfig[5].color, 0.1),
+                                      color: tabsConfig[5].color,
+                                      fontWeight: 600,
+                                    }} />
+                                  <IconButton
+                                    onClick={() => removeBienInmueble(index)}
+                                    size="small"
+                                    sx={{
+                                      color: theme.palette.error.main,
+                                      '&:hover': { background: alpha(theme.palette.error.main, 0.1) },
+                                    }}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Stack>
+
+                                <Grid container spacing={2}>
+                                  <Grid item xs={12}>
+                                    <GlassTextField
+                                      {...register(`bienesInmuebles.${index}.descripcion`, { required: 'Campo requerido' })}
+                                      label="Descripción"
+                                      multiline
+                                      rows={3}
+                                      fullWidth
+                                      error={!!errors.bienesInmuebles?.[index]?.descripcion}
+                                      helperText={errors.bienesInmuebles?.[index]?.descripcion?.message} />
+                                  </Grid>
+                                  <Grid item xs={6} sm={4}>
+                                    <GlassTextField
+                                      {...register(`bienesInmuebles.${index}.matricula`, { required: 'Campo requerido' })}
+                                      label="Matrícula Inmobiliaria"
+                                      fullWidth
+                                      error={!!errors.bienesInmuebles?.[index]?.matricula} />
+                                  </Grid>
+                                  <Grid item xs={6} sm={4}>
+                                    <GlassTextField
+                                      {...register(`bienesInmuebles.${index}.escrituraPublica`)}
+                                      label="Escritura Pública"
+                                      fullWidth
+                                    />
+                                  </Grid>
+                                  <Grid item xs={6} sm={4}>
+                                    <GlassTextField
+                                      {...register(`bienesInmuebles.${index}.avaluoCatastral`)}
+                                      label="Avalúo Catastral"
+                                      type="number"
+                                      fullWidth
+                                    />
+                                  </Grid>
+                                  <Grid item xs={6} sm={4}>
+                                    <GlassTextField
+                                      {...register(`bienesInmuebles.${index}.direccion`, { required: 'Campo requerido' })}
+                                      label="Dirección"
+                                      fullWidth
+                                      error={!!errors.bienesInmuebles?.[index]?.direccion} />
+                                  </Grid>
+                                  <LocationSelector
+                                    control={control}
+                                    errors={errors}
+                                    watch={watch}
+                                    setValue={setValue}
+                                    showCountry={true}
+                                    showDepartment={true}
+                                    showCity={true}
+                                    countryFieldName={`bienesInmuebles.${index}.pais`}
+                                    departmentFieldName={`bienesInmuebles.${index}.departamento`}
+                                    cityFieldName={`bienesInmuebles.${index}.ciudad`}
+                                    countryLabel="País"
+                                    departmentLabel="Departamento"
+                                    cityLabel="Ciudad"
+                                    countryGridProps={{ xs: 12, sm: 4 }}
+                                    departmentGridProps={{ xs: 12, sm: 4 }}
+                                    cityGridProps={{ xs: 12, sm: 4 }}
+                                  />
+                                  <Grid item xs={6} sm={4}>
+                                    <GlassTextField
+                                      {...register(`bienesInmuebles.${index}.porcentajeParticipacion`, { required: 'Campo requerido', valueAsNumber: true, max: { value: 100, message: 'El porcentaje no puede ser mayor a 100' } })}
+                                      label="% de Participación"
+                                      fullWidth
+                                      error={!!errors.bienesInmuebles?.[index]?.porcentajeParticipacion} />
+                                  </Grid>
+                                  <Grid item xs={12} sm={6}>
+                                    <GlassTextField
+                                      {...register(`bienesInmuebles.${index}.avaluoComercial`, { required: 'Campo requerido' })}
+                                      label="Avalúo Comercial Estimado"
+                                      type="number"
+                                      fullWidth
+                                      sx={{ minWidth: 250, }}
+                                      error={!!errors.bienesInmuebles?.[index]?.avaluoComercial} />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <FormControlLabel
+                                      control={<Checkbox {...register(`bienesInmuebles.${index}.afectadoViviendaFamiliar`)} />}
+                                      label="Afectado a Vivienda Familiar" />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle1">Afectaciones, Gravámenes y Medidas Cautelares:</Typography>
+                                  </Grid>
+                                  <Grid item xs={12} sm={6}>
+                                    <FormControl fullWidth>
+                                      <InputLabel>Tipo de Complemento</InputLabel>
+                                      <Controller
+                                        name={`bienesInmuebles.${index}.tipoComplemento`}
+                                        control={control}
+                                        defaultValue=""
+                                        render={({ field }) => (
+                                          <Select
+                                            {...field}
+                                            label="Tipo de Complemento"
+                                            sx={selectSx}
+                                          >
+                                            <MenuItem value="Afectación">Afectación</MenuItem>
+                                            <MenuItem value="Gravámen">Gravámen</MenuItem>
+                                            <MenuItem value="Medida cautelar">Medida cautelar</MenuItem>
+                                          </Select>
+                                        )}
+                                      />
+                                    </FormControl>
+                                  </Grid>
+                                  {watch(`bienesInmuebles.${index}.tipoComplemento`) && (
+                                    <Grid item xs={12} sm={6}>
+                                      <FormControl fullWidth>
+                                        <InputLabel>Categoría</InputLabel>
+                                        <Controller
+                                          name={`bienesInmuebles.${index}.categoria`}
+                                          control={control}
+                                          defaultValue=""
+                                          render={({ field }) => (
+                                            <Select
+                                              {...field}
+                                              label="Categoría"
+                                              sx={selectSx}
+                                            >
+                                              {watch(`bienesInmuebles.${index}.tipoComplemento`) === 'Afectación' && [
+                                                <MenuItem value="Anticresis">Anticresis</MenuItem>,
+                                                <MenuItem value="Arriendo">Arriendo</MenuItem>,
+                                                <MenuItem value="Patrimonio Familiar">Patrimonio Familiar</MenuItem>,
+                                                <MenuItem value="Servidumbre">Servidumbre</MenuItem>,
+                                                <MenuItem value="Uso y habitación">Uso y habitación</MenuItem>,
+                                                <MenuItem value="Usufructo">Usufructo</MenuItem>,
+                                                <MenuItem value="Vivienda Familiar">Vivienda Familiar</MenuItem>
+                                              ]}
+                                              {watch(`bienesInmuebles.${index}.tipoComplemento`) === 'Gravámen' && [
+                                                <MenuItem value="Hipotecario">Hipotecario</MenuItem>,
+                                                <MenuItem value="Prenda">Prenda</MenuItem>,
+                                                <MenuItem value="Propiedad Fiduciaria">Propiedad Fiduciaria</MenuItem>
+                                              ]}
+                                              {watch(`bienesInmuebles.${index}.tipoComplemento`) === 'Medida cautelar' && [
+                                                <MenuItem value="Embargo">Embargo</MenuItem>,
+                                                <MenuItem value="Secuestro">Secuestro</MenuItem>
+                                              ]}
+                                            </Select>
+                                          )}
+                                        />
+                                      </FormControl>
+                                    </Grid>
+                                  )}
+                                  <Grid item xs={12}>
+                                    <GlassTextField
+                                      {...register(`bienesInmuebles.${index}.descripcionComplemento`)}
+                                      label="Descripción del Complemento"
+                                      fullWidth
+                                      multiline
+                                      rows={2}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <GlassCard>
+                                      <Box sx={{ p: 2 }}>
+                                        <Stack spacing={1}>
+                                          <Typography variant="subtitle1">Garantías</Typography>
+                                          <FormControlLabel
+                                            control={<Switch {...register(`bienesInmuebles.${index}.leasing`)} />}
+                                            label="Leasing"
+                                          />
+                                          <FormControlLabel
+                                            control={<Switch {...register(`bienesInmuebles.${index}.prenda`)} />}
+                                            label="Prenda"
+                                          />
+                                          <FormControlLabel
+                                            control={<Switch {...register(`bienesInmuebles.${index}.garantiaMobiliaria`)} />}
+                                            label="Garantía Mobiliaria"
+                                          />
+                                          <FormControlLabel
+                                            control={<Switch {...register(`bienesInmuebles.${index}.pactoRetroventa`)} />}
+                                            label="Pacto Retroventa"
+                                          />
+                                          {(watch(`bienesInmuebles.${index}.leasing`) || watch(`bienesInmuebles.${index}.prenda`) || watch(`bienesInmuebles.${index}.garantiaMobiliaria`) || watch(`bienesInmuebles.${index}.pactoRetroventa`)) && (
+                                            <Box>
+                                              <Typography variant="subtitle1" sx={{ mt: 2 }}>Acreedores</Typography>
+                                              {acreedoresData?.rows
+                                                .filter(acreedor => acreenciasValues.some(a => a.acreedor === acreedor._id))
+                                                .map((acreedor) => (
+                                                  <FormControlLabel
+                                                    key={acreedor._id}
+                                                    control={<Checkbox {...register(`bienesInmuebles.${index}.acreedores.${acreedor._id}`)} />}
+                                                    label={acreedor.nombre}
+                                                  />
+                                                ))}
+                                            </Box>
+                                          )}
+                                        </Stack>
+                                      </Box>
+                                    </GlassCard>
+                                  </Grid>
+                                </Grid>
+                              </Stack>
+                            </Box>
+                          </GlassCard>
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+                </Box>
+
+                <Button
+                  variant="contained"
+                  onClick={() => handleSaveSection('bienes', 6)}
+                  disabled={isSaving}
+                  startIcon={isSaving ? null : <SaveIcon />}
+                  sx={{
+                    mt: 2,
+                    py: 1.5,
+                    px: 4,
+                    borderRadius: '12px',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    background: `linear-gradient(135deg, ${tabsConfig[5].color}, ${alpha(tabsConfig[5].color, 0.7)})`,
+                    '&:hover': {
+                      background: `linear-gradient(135deg, ${alpha(tabsConfig[5].color, 0.9)}, ${alpha(tabsConfig[5].color, 0.6)})`,
+                      transform: 'translateY(-2px)',
+                    },
+                  }}
+                >
+                  {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
+                </Button>
+              </Stack>
+            </Box>
+          </GlassCard>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={6}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={4}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar sx={{ bgcolor: alpha(tabsConfig[5].color, 0.1), color: tabsConfig[5].color }}>
+                <Avatar sx={{ bgcolor: alpha(tabsConfig[6].color, 0.1), color: tabsConfig[6].color }}>
                   <TrendingUpIcon />
                 </Avatar>
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -2124,11 +2794,11 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                     size="small"
                     sx={{
                       borderRadius: '12px',
-                      borderColor: alpha(tabsConfig[5].color, 0.3),
-                      color: tabsConfig[5].color,
+                      borderColor: alpha(tabsConfig[6].color, 0.3),
+                      color: tabsConfig[6].color,
                       '&:hover': {
-                        borderColor: tabsConfig[5].color,
-                        background: alpha(tabsConfig[5].color, 0.1),
+                        borderColor: tabsConfig[6].color,
+                        background: alpha(tabsConfig[6].color, 0.1),
                       },
                     }}
                   >
@@ -2144,7 +2814,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                   <Stack spacing={2}>
                     {obligacionesFields.map((field, index) => (
                       <Box key={field.id}>
-                        <GlassCard sx={{ border: `1px solid ${alpha(tabsConfig[5].color, 0.2)}` }}>
+                        <GlassCard sx={{ border: `1px solid ${alpha(tabsConfig[6].color, 0.2)}` }}>
                           <Box sx={{ p: 2 }}>
                             <Stack spacing={2}>
                               <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -2152,8 +2822,8 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                                   label={`Obligación #${index + 1}`}
                                   size="small"
                                   sx={{
-                                    background: alpha(tabsConfig[5].color, 0.1),
-                                    color: tabsConfig[5].color,
+                                    background: alpha(tabsConfig[6].color, 0.1),
+                                    color: tabsConfig[6].color,
                                     fontWeight: 600,
                                   }} />
                                 <IconButton
@@ -2308,14 +2978,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                 label="¿Posee bienes embargables?"
               />
 
-              <Button variant="contained" onClick={() => handleSaveSection('informacionFinanciera', 6)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+              <Button variant="contained" onClick={() => handleSaveSection('informacionFinanciera', 7)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
                 {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
               </Button>
             </Stack>
           </GlassCard>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={6}>
+        <TabPanel value={tabValue} index={7}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={2}>
               <Typography variant="h6">Pruebas</Typography>
@@ -2428,7 +3098,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
           <GlassCard sx={{ p: 3, mt: 3 }}>
             <Stack spacing={2}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar sx={{ bgcolor: alpha(tabsConfig[6].color, 0.1), color: tabsConfig[6].color }}>
+                <Avatar sx={{ bgcolor: alpha(tabsConfig[7].color, 0.1), color: tabsConfig[7].color }}>
                   <AttachFileIcon />
                 </Avatar>
                 <Box>
@@ -2519,14 +3189,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                 );
               })}
               <Button variant="outlined" onClick={() => appendAnexo({ name: '', file: null, descripcion: '', url: '' })} startIcon={<AddIcon />}>Añadir Anexo</Button>
-              <Button variant="contained" onClick={() => handleSaveSection('anexos', 7)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
+              <Button variant="contained" onClick={() => handleSaveSection('anexos', 8)} disabled={isSaving} startIcon={<SaveIcon />} sx={{ mt: 2 }}>
                 {isSaving ? 'Guardando...' : 'Guardar y Continuar'}
               </Button>
             </Stack>
           </GlassCard>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={7}>
+        <TabPanel value={tabValue} index={8}>
           <GlassCard sx={{ p: 3 }}>
             <Stack spacing={3}>
               <Typography variant="h6">Firma del Apoderado</Typography>

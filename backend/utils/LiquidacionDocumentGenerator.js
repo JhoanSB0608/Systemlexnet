@@ -334,7 +334,9 @@ function buildLiquidacionDocDefinition(solicitud = {}) {
     { text: `${nombreApoderado}, `, bold: true },
     { text: `mayor de edad, ${identificado(apoderado.genero)} con C.C. N° ${safe(apoderado.cedula)} de ${safe(apoderado.ciudadExpedicion)}, con T.P. ${safe(apoderado.tp)} del C.S.J., actuando en nombre y representación de ${prohijado(deudor.genero)} `, bold: false }, 
     { text: `${nombreDeudor}, `, bold: true },
-    { text: `mayor de edad, ${identDeudor}, ${bloqueDatos}, respetuosamente me permito solicitar a su despacho la `, bold: false },
+    { text: `mayor de edad, ${identDeudor}, `, bold: false },
+    ...bloqueDatos,
+    { text: `, respetuosamente me permito solicitar a su despacho la `, bold: false },
     { text: 'APERTURA DEL PROCEDIMIENTO DE LIQUIDACIÓN PATRIMONIAL DIRECTA', bold: true },
     `, regulado en el Título IV de la Sección Tercera del Libro Tercero de la Ley 1564 de 2012 —Código General del Proceso—, con fundamento en los siguientes:`,
   ], { margin: [0, 0, 0, 10] }));
