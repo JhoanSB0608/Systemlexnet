@@ -216,7 +216,10 @@ const buildFormattedData = (initialData) => ({
     tipoBienMueble: b.tipoBienMueble || '',
     clasificacion: b.clasificacion || '',
   })),
-  bienesInmuebles: initialData.bienesInmuebles || [],
+  bienesInmuebles: initialData.bienesInmuebles?.map((b) => ({
+    ...b,
+    acreedores: b.acreedores || {},
+  })) || [],
   noPoseeBienes: initialData.noPoseeBienes ?? false,
   pruebas: initialData.pruebas?.length ? initialData.pruebas : [...PRUEBAS_PREDETERMINADAS],
   informacionFinanciera: {
@@ -229,7 +232,8 @@ const buildFormattedData = (initialData) => ({
     name: a.name,
     url: a.url,
     file: undefined,
-  })),
+  })) || [],
+  firma: initialData.firma || { source: 'draw', data: null, file: null },
   firmaDeudor: initialData.firmaDeudor || { source: 'draw', data: null, file: null },
   bienesInventarioImagen: initialData.bienesInventarioImagen || { name: '', url: '', descripcion: '' },
   certificacionLaboralImagen: initialData.certificacionLaboralImagen || { name: '', url: '', descripcion: '' },
@@ -454,15 +458,23 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       if (initialData.firma) {
         const { source, data, url } = initialData.firma;
         setSignatureSource(source || 'draw');
+        setValue('firma.source', source || 'draw');
         if (source === 'draw' && data) {
+          setSignatureImage(data);
+          setValue('firma.data', data);
           setTimeout(() => {
             if (sigCanvas.current && sigCanvas.current.fromDataURL) {
-              sigCanvas.current.fromDataURL(data);
+              try {
+                sigCanvas.current.fromDataURL(data);
+              } catch (e) {
+                console.warn('[LiquidacionForm] No se pudo cargar firma en canvas:', e);
+              }
             }
-          }, 200);
+          }, 500);
         } else if (source === 'upload' && url) {
           const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://api.systemlex.com.co';
-          setSignatureImage(`${backendUrl}${url}`);
+          const fullUrl = /^https?:\/\//i.test(url) ? url : `${backendUrl}${url.startsWith('/') ? url : '/' + url}`;
+          setSignatureImage(fullUrl);
           setValue('firma.url', url);
         }
       }
@@ -470,15 +482,23 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       if (initialData.firmaDeudor) {
         const { source, data, url } = initialData.firmaDeudor;
         setSignatureSourceDeudor(source || 'draw');
+        setValue('firmaDeudor.source', source || 'draw');
         if (source === 'draw' && data) {
+          setSignatureImageDeudor(data);
+          setValue('firmaDeudor.data', data);
           setTimeout(() => {
             if (sigCanvasDeudor.current && sigCanvasDeudor.current.fromDataURL) {
-              sigCanvasDeudor.current.fromDataURL(data);
+              try {
+                sigCanvasDeudor.current.fromDataURL(data);
+              } catch (e) {
+                console.warn('[LiquidacionForm] No se pudo cargar firma del deudor en canvas:', e);
+              }
             }
-          }, 200);
+          }, 500);
         } else if (source === 'upload' && url) {
           const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://api.systemlex.com.co';
-          setSignatureImageDeudor(`${backendUrl}${url}`);
+          const fullUrl = /^https?:\/\//i.test(url) ? url : `${backendUrl}${url.startsWith('/') ? url : '/' + url}`;
+          setSignatureImageDeudor(fullUrl);
           setValue('firmaDeudor.url', url);
         }
       }
@@ -571,6 +591,12 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
 
   const watchedBienesMuebles = watch('bienesMuebles');
   useEffect(() => {
+    const noPosee = watch('noPoseeBienes');
+    if (noPosee) {
+      setValue('bienesMuebles', []);
+      setValue('bienesInmuebles', []);
+      return;
+    }
     watchedBienesMuebles?.forEach((field, index) => {
       if (field) {
         const { leasing, prenda, garantiaMobiliaria, pactoRetroventa } = field;
@@ -579,10 +605,16 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         }
       }
     });
-  }, [watchedBienesMuebles, setValue]);
+  }, [watchedBienesMuebles, setValue, watch]);
 
   const watchedBienesInmuebles = watch('bienesInmuebles');
   useEffect(() => {
+    const noPosee = watch('noPoseeBienes');
+    if (noPosee) {
+      setValue('bienesMuebles', []);
+      setValue('bienesInmuebles', []);
+      return;
+    }
     watchedBienesInmuebles?.forEach((field, index) => {
       if (field) {
         const { leasing, prenda, garantiaMobiliaria, pactoRetroventa } = field;
@@ -591,7 +623,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
         }
       }
     });
-  }, [watchedBienesInmuebles, setValue]);
+  }, [watchedBienesInmuebles, setValue, watch]);
 
   const totalCapital = (acreenciasValues || []).reduce((sum, a) => sum + (parseFloat(a.capital) || 0), 0) || 0;
   const obligacionesEnMora = (acreenciasValues || []).filter(a => a.creditoEnMora === true && a.moraMas90Dias === true);
@@ -647,15 +679,30 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     return { grouped, clasesConDatos, total: totalCapital };
   })();
 
-  const handleSignatureDeudorFileUpload = (e) => {
+  const [uploadingFirmaDeudor, setUploadingFirmaDeudor] = useState(false);
+  const handleSignatureDeudorFileUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
+    if (!file) return;
+    setUploadingFirmaDeudor(true);
+    try {
+      const { fileUrl, uniqueFilename } = await uploadFile(file);
       setValue('firmaDeudor.file', file);
+      setValue('firmaDeudor.url', fileUrl);
+      setValue('firmaDeudor.name', uniqueFilename || file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
         setSignatureImageDeudor(reader.result);
       };
       reader.readAsDataURL(file);
+      if (autosaveEnabled) {
+        requestSave(buildAutosavePayload());
+      }
+    } catch (error) {
+      console.error('Error uploading deudor signature:', error);
+      setError('firmaDeudor.file', { type: 'manual', message: 'Error al subir la firma' });
+    } finally {
+      setUploadingFirmaDeudor(false);
+      e.target.value = null;
     }
   };
 
@@ -712,15 +759,30 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
     }
   };
 
-  const handleSignatureFileUpload = (e) => {
+  const [uploadingFirma, setUploadingFirma] = useState(false);
+  const handleSignatureFileUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
+    if (!file) return;
+    setUploadingFirma(true);
+    try {
+      const { fileUrl, uniqueFilename } = await uploadFile(file);
       setValue('firma.file', file);
+      setValue('firma.url', fileUrl);
+      setValue('firma.name', uniqueFilename || file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
         setSignatureImage(reader.result);
       };
       reader.readAsDataURL(file);
+      if (autosaveEnabled) {
+        requestSave(buildAutosavePayload());
+      }
+    } catch (error) {
+      console.error('Error uploading signature:', error);
+      setError('firma.file', { type: 'manual', message: 'Error al subir la firma' });
+    } finally {
+      setUploadingFirma(false);
+      e.target.value = null;
     }
   };
 
@@ -778,6 +840,15 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       default: break;
     }
 
+    if (sectionName === 'bienes') {
+      const noPosee = getValues('noPoseeBienes');
+      if (noPosee) {
+        setValue('bienesMuebles', []);
+        setValue('bienesInmuebles', []);
+        clearErrors(['bienesMuebles', 'bienesInmuebles']);
+      }
+    }
+
     const results = await Promise.all(fieldsToValidate.map(field => trigger(field)));
     const isValid = results.every(Boolean);
 
@@ -831,7 +902,7 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
       pruebas: (data.pruebas || []).map((p) => (p || '').trim()).filter(Boolean),
       anexos: (data.anexos || []).map(anexo => ({
         ...anexo,
-        name: anexo.url ? anexo.name : (anexo.descripcion ? ' ' : anexo.name),
+        name: anexo.url ? (anexo.name || anexo.filename || '') : (anexo.descripcion ? ' ' : anexo.name),
         url: anexo.url || '',
       })),
     };
@@ -1147,6 +1218,19 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                 return true;
               }
               return (value && value.length > 0) || "Debe agregar al menos un bien mueble si no ha marcado la opción de no poseer bienes.";
+            },
+          }}
+          render={() => null}
+        />
+        <Controller
+          name="bienesInmuebles"
+          control={control}
+          rules={{
+            validate: (value) => {
+              if (getValues("noPoseeBienes")) {
+                return true;
+              }
+              return true;
             },
           }}
           render={() => null}
@@ -2071,6 +2155,14 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                           <Checkbox
                             {...field}
                             checked={field.value}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              field.onChange(checked);
+                              if (checked) {
+                                setValue('bienesMuebles', []);
+                                setValue('bienesInmuebles', []);
+                              }
+                            }}
                             sx={{
                               color: theme.palette.warning.main,
                               '&.Mui-checked': {
@@ -3238,7 +3330,16 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                         height: canvasSize.height,
                         style: { background: '#f8f8f8', borderRadius: '12px' }
                       }}
-                      onEnd={() => setValue('firma.data', sigCanvas.current.getTrimmedCanvas().toDataURL('image/png'))}
+                      onEnd={() => {
+                        if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
+                          const data = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
+                          setValue('firma.data', data);
+                          setSignatureImage(data);
+                          if (autosaveEnabled) {
+                            requestSave(buildAutosavePayload());
+                          }
+                        }
+                      }}
                     />
                   </Box>
                   <Button
@@ -3261,9 +3362,10 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                   <Button
                     variant="outlined"
                     component="label"
-                    startIcon={<UploadFileIcon />}
+                    disabled={uploadingFirma}
+                    startIcon={uploadingFirma ? <CircularProgress size={20} /> : <UploadFileIcon />}
                   >
-                    Seleccionar Archivo
+                    {uploadingFirma ? 'Subiendo...' : 'Seleccionar Archivo'}
                     <input
                       type="file"
                       hidden
@@ -3344,7 +3446,16 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                         height: deudorCanvasSize.height,
                         style: { background: '#f8f8f8', borderRadius: '12px' }
                       }}
-                      onEnd={() => setValue('firmaDeudor.data', sigCanvasDeudor.current.getTrimmedCanvas().toDataURL('image/png'))}
+                      onEnd={() => {
+                        if (sigCanvasDeudor.current && !sigCanvasDeudor.current.isEmpty()) {
+                          const data = sigCanvasDeudor.current.getTrimmedCanvas().toDataURL('image/png');
+                          setValue('firmaDeudor.data', data);
+                          setSignatureImageDeudor(data);
+                          if (autosaveEnabled) {
+                            requestSave(buildAutosavePayload());
+                          }
+                        }
+                      }}
                     />
                   </Box>
                   <Button
@@ -3367,9 +3478,10 @@ const LiquidacionForm = ({ onSubmit, resetToken, initialData, isUpdating }) => {
                   <Button
                     variant="outlined"
                     component="label"
-                    startIcon={<UploadFileIcon />}
+                    disabled={uploadingFirmaDeudor}
+                    startIcon={uploadingFirmaDeudor ? <CircularProgress size={20} /> : <UploadFileIcon />}
                   >
-                    Seleccionar Archivo
+                    {uploadingFirmaDeudor ? 'Subiendo...' : 'Seleccionar Archivo'}
                     <input
                       type="file"
                       hidden

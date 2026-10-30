@@ -302,13 +302,17 @@ const getSolicitudDocumento = async (req, res) => {
           return res.status(400).json({ message: 'Nombre de archivo del anexo no especificado.' });
         }
 
-        const anexo = solicitud.anexos.find(a => a.filename === filename);
+        const anexo = solicitud.anexos.find(a => (a.filename === filename) || (a.name === filename) || (a.url && a.url.includes(filename)));
         if (!anexo) {
           return res.status(404).json({ message: 'Anexo no encontrado.' });
         }
 
+        if (anexo.url && /^https?:\/\//i.test(anexo.url)) {
+          return res.redirect(anexo.url);
+        }
+
         // The path in the DB should be relative to the project root, e.g., 'uploads/filename.pdf'
-        const filePath = path.resolve(anexo.path);
+        const filePath = path.resolve(anexo.path || path.join('uploads', anexo.filename || anexo.name || filename));
         
         // Security check: ensure the path is within the uploads directory
         // Resolve uploadsDir relative to this controller's directory (__dirname)
@@ -318,7 +322,7 @@ const getSolicitudDocumento = async (req, res) => {
           return res.status(403).json({ message: 'Acceso a archivo no permitido.' });
         }
 
-        res.download(filePath, anexo.filename, (err) => {
+        res.download(filePath, anexo.filename || anexo.name, (err) => {
           if (err) {
             console.error(`Error al descargar el anexo "${anexo.filename}" (ID: ${solicitud._id}):`, err);
             console.error(`Ruta del archivo intentada: ${filePath}, Código de error: ${err.code}`);

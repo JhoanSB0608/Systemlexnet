@@ -224,13 +224,20 @@ const overrideTitle = (text, opts = {}) => ({
   ...opts,
 });
 
-function firmaDeudorBloque(deudor = {}, firmaDeudor) {
+function firmaDeudorBloque(deudor = {}, firmaDeudor = {}) {
   const stack = [];
-  if (firmaDeudor && firmaDeudor.data && /^data:/i.test(firmaDeudor.data)) {
-    stack.push({ image: firmaDeudor.data, width: 170, alignment: 'left', margin: [0, 6, 0, 2] });
+  const firma = firmaDeudor && typeof firmaDeudor === 'object' ? firmaDeudor : {};
+  const firmaData = firma.data || firma.firma || firma.imagen || firma.image || firma.firmaDataUrl || firma.url;
+  const isDataUrl = typeof firmaData === 'string' && /^data:/i.test(firmaData);
+
+  if (isDataUrl) {
+    stack.push({ image: firmaData, width: 170, alignment: 'left', margin: [0, 6, 0, 2] });
+  } else if (firma && firma.source === 'upload' && firma.url && /^data:/i.test(firma.url)) {
+    stack.push({ image: firma.url, width: 170, alignment: 'left', margin: [0, 6, 0, 2] });
   } else {
     stack.push({ canvas: [{ type: 'line', x1: 0, y1: 8, x2: 210, y2: 8, lineWidth: 0.8, lineColor: 'black' }], margin: [0, 12, 0, 10] });
   }
+
   stack.push({ text: nombreCompletoDeudor(deudor), bold: true, fontSize: 11, margin: [0, 0, 0, 2] });
   stack.push({
     text: `${identificado(deudor.genero).replace(/^./, (c) => c.toUpperCase())} con Cédula de Ciudadanía No. ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`,
@@ -817,13 +824,7 @@ function buildAnexosDocDefinition(solicitud = {}) {
     [0, 0, 0, 0]
   ));
 
-  c.push({ text: '_'.repeat(40), ...ANEXO9, margin: [0, 50.4, 0, 0] });
-  c.push({ text: nombreDeudor, ...ANEXO9, bold: true, margin: [0, 1.9, 0, 0] });
-  c.push({
-    text: `C. C. n.º ${safe(deudor.cedula)} expedida en ${safe(deudor.ciudadExpedicion)}`,
-    ...ANEXO9,
-    margin: [0, 0.9, 0, 0],
-  });
+  c.push(firmaDeudorBloque(deudor, firmaDeudor));
 
   // ============ ANEXO REDAM (imagen) ============
   // Si el REDAM es una imagen se incrusta en una sola página al final del
@@ -860,15 +861,28 @@ async function loadAnexosImages(solicitud = {}, baseUrl = '') {
   };
 
   const firma = copy.firmaDeudor;
-  if (firma && typeof firma === 'object' && firma.source === 'upload' && firma.url && !/^data:/i.test(firma.url)) {
-    let url = firma.url;
-    if (!/^https?:\/\//i.test(url) && baseUrl) {
-      url = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
+  if (firma && typeof firma === 'object') {
+    // Ya viene en data
+    if (firma.data && /^data:/i.test(firma.data)) {
+      copy.firmaDeudor = firma;
+    } else if (firma.url && /^data:/i.test(firma.url)) {
+      copy.firmaDeudor = { ...firma, data: firma.url };
+    } else if ((firma.source === 'upload' || firma.url || firma.firma) && !firma.data) {
+      let url = firma.url || firma.firma || firma.imagen || firma.image;
+      if (typeof url === 'string' && /^data:/i.test(url)) {
+        copy.firmaDeudor = { ...firma, data: url };
+      } else if (typeof url === 'string' && url) {
+        if (!/^https?:\/\//i.test(url) && baseUrl) {
+          url = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
+        }
+        if (/^https?:\/\//i.test(url)) {
+          const dataUrl = await fetchUrlToDataUrl(url);
+          if (dataUrl) copy.firmaDeudor = { ...firma, data: dataUrl };
+        }
+      }
     }
-    if (/^https?:\/\//i.test(url)) {
-      const dataUrl = await fetchUrlToDataUrl(url);
-      if (dataUrl) copy.firmaDeudor = { ...firma, data: dataUrl };
-    }
+  } else if (typeof firma === 'string' && /^data:/i.test(firma)) {
+    copy.firmaDeudor = { data: firma };
   }
 
   // Anexos 3 y 6: si son imágenes se cargan como dataUrl para incrustarlas en el
@@ -912,12 +926,14 @@ async function generateLiquidacionAnexosPdf(solicitud = {}, baseUrl = '') {
   // Descarga (o decodifica) el PDF de un archivo anexo y fusiona sus páginas
   // al final del documento de anexos.
   const appendPdf = async (buffer, archivo) => {
-    if (!archivo || !esArchivoPdf(archivo) || !archivo.url) return buffer;
+    if (!archivo || !esArchivoPdf(archivo) || (!archivo.url && !archivo.data)) return buffer;
     try {
       let pdfBuffer = null;
-      if (/^data:application\/pdf;base64,/i.test(archivo.url)) {
+      if (archivo.data && /^data:application\/pdf;base64,/i.test(archivo.data)) {
+        pdfBuffer = Buffer.from(archivo.data.split(',')[1], 'base64');
+      } else if (archivo.url && /^data:application\/pdf;base64,/i.test(archivo.url)) {
         pdfBuffer = Buffer.from(archivo.url.split(',')[1], 'base64');
-      } else if (/^https?:\/\//i.test(archivo.url) || baseUrl) {
+      } else if (archivo.url && /^https?:\/\//i.test(archivo.url) || baseUrl) {
         let url = archivo.url;
         if (!/^https?:\/\//i.test(url) && baseUrl) {
           url = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;

@@ -89,18 +89,22 @@ const getLiquidacionDocumento = async (req, res) => {
           return res.status(400).json({ message: 'Nombre de archivo del anexo no especificado.' });
         }
 
-        const anexo = liquidacion.anexos.find(a => a.filename === filename);
+        const anexo = liquidacion.anexos.find(a => (a.filename === filename) || (a.name === filename) || (a.url && a.url.includes(filename)));
         if (!anexo) {
           return res.status(404).json({ message: 'Anexo no encontrado.' });
         }
 
-        const filePath = path.resolve(anexo.path);
+        if (anexo.url && /^https?:\/\//i.test(anexo.url)) {
+          return res.redirect(anexo.url);
+        }
+
+        const filePath = path.resolve(anexo.path || path.join('uploads', anexo.filename || anexo.name || filename));
         const uploadsDir = path.resolve('uploads');
         if (!filePath.startsWith(uploadsDir)) {
           return res.status(403).json({ message: 'Acceso a archivo no permitido.' });
         }
 
-        res.download(filePath, anexo.filename, (err) => {
+        res.download(filePath, anexo.filename || anexo.name, (err) => {
           if (err) {
             console.error('Error al descargar el anexo:', err);
             if (!res.headersSent) {
