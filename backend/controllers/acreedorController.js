@@ -48,13 +48,16 @@ const getAcreedores = async (req, res) => {
 // @route   GET /api/acreedores/:id
 // @access  Private
 const getAcreedorById = async (req, res) => {
-  const acreedor = await Acreedor.findById(req.params.id);
+  try {
+    const acreedor = await Acreedor.findById(req.params.id);
 
-  if (acreedor && acreedor.user.equals(req.user._id)) {
+    if (!acreedor) {
+      return res.status(404).json({ message: 'Acreedor no encontrado' });
+    }
+
     res.json(acreedor);
-  } else {
-    res.status(404);
-    throw new Error('Acreedor no encontrado o no autorizado');
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener acreedor', error: error.message });
   }
 };
 
@@ -62,35 +65,33 @@ const getAcreedorById = async (req, res) => {
 // @route   POST /api/acreedores
 // @access  Private
 const createAcreedor = async (req, res) => {
-  const { nombre, tipoDoc, nitCc, direccion, email, telefono, pais, departamento, ciudad } = req.body;
-
-  if (!nombre || !tipoDoc || !nitCc || !direccion || !email || !telefono) {
-    res.status(400);
-    throw new Error('Por favor, complete todos los campos obligatorios.');
-  }
-
-  const acreedor = new Acreedor({
-    user: req.user._id,
-    nombre,
-    tipoDoc, // Asegurándose de que se incluye
-    nitCc,
-    direccion,
-    email,
-    telefono,
-    pais,
-    departamento,
-    ciudad,
-  });
-
   try {
+    const { nombre, tipoDoc, nitCc, direccion, email, telefono, pais, departamento, ciudad } = req.body;
+
+    if (!nombre || !tipoDoc || !nitCc || !direccion || !email || !telefono) {
+      return res.status(400).json({ message: 'Por favor, complete todos los campos obligatorios.' });
+    }
+
+    const acreedor = new Acreedor({
+      user: req.user._id,
+      nombre,
+      tipoDoc, // Asegurándose de que se incluye
+      nitCc,
+      direccion,
+      email,
+      telefono,
+      pais,
+      departamento,
+      ciudad,
+    });
+
     const createdAcreedor = await acreedor.save();
     res.status(201).json(createdAcreedor);
   } catch (error) {
     if (error.code === 11000) {
-        res.status(400).json({ message: 'Ya existe un acreedor con este No. de Documento para su usuario.' });
-    } else {
-        res.status(400).json({ message: error.message });
+      return res.status(400).json({ message: 'Ya existe un acreedor con este No. de Documento para su usuario.' });
     }
+    res.status(400).json({ message: error.message });
   }
 };
 
@@ -98,9 +99,13 @@ const createAcreedor = async (req, res) => {
 // @route   PUT /api/acreedores/:id
 // @access  Private
 const updateAcreedor = async (req, res) => {
-  const acreedor = await Acreedor.findById(req.params.id);
+  try {
+    const acreedor = await Acreedor.findById(req.params.id);
 
-  if (acreedor && acreedor.user.equals(req.user._id)) {
+    if (!acreedor) {
+      return res.status(404).json({ message: 'Acreedor no encontrado' });
+    }
+
     const { nombre, tipoDoc, nitCc, direccion, email, telefono, pais, departamento, ciudad } = req.body;
 
     acreedor.nombre = nombre || acreedor.nombre;
@@ -113,19 +118,13 @@ const updateAcreedor = async (req, res) => {
     acreedor.departamento = departamento || acreedor.departamento;
     acreedor.ciudad = ciudad || acreedor.ciudad;
 
-    try {
-        const updatedAcreedor = await acreedor.save();
-        res.json(updatedAcreedor);
-    } catch (error) {
-        if (error.code === 11000) {
-            res.status(400).json({ message: 'Conflicto: Ya existe otro acreedor con este No. de Documento.' });
-        } else {
-            res.status(400).json({ message: error.message });
-        }
+    const updatedAcreedor = await acreedor.save();
+    res.json(updatedAcreedor);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Conflicto: Ya existe otro acreedor con este No. de Documento.' });
     }
-  } else {
-    res.status(404);
-    throw new Error('Acreedor no encontrado o no autorizado');
+    res.status(400).json({ message: error.message });
   }
 };
 
@@ -133,14 +132,17 @@ const updateAcreedor = async (req, res) => {
 // @route   DELETE /api/acreedores/:id
 // @access  Private
 const deleteAcreedor = async (req, res) => {
-  const acreedor = await Acreedor.findById(req.params.id);
+  try {
+    const acreedor = await Acreedor.findById(req.params.id);
 
-  if (acreedor && acreedor.user.equals(req.user._id)) {
+    if (!acreedor) {
+      return res.status(404).json({ message: 'Acreedor no encontrado' });
+    }
+
     await acreedor.deleteOne();
     res.json({ message: 'Acreedor eliminado' });
-  } else {
-    res.status(404);
-    throw new Error('Acreedor no encontrado o no autorizado');
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar acreedor', error: error.message });
   }
 };
 
